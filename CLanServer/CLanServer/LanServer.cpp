@@ -1,5 +1,5 @@
 #include"stdafx.h"
-#include "NetworkModule.h"
+#include "LanServer.h"
 
 /*======================================================================
 //»ý¼ºÀÚ

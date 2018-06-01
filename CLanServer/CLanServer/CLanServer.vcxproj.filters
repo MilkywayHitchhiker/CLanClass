@@ -14,7 +14,7 @@
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
     <Filter Include="소스 파일\lib">
-      <UniqueIdentifier>{511fe421-6db2-4895-98f3-f665e36fae0e}</UniqueIdentifier>
+      <UniqueIdentifier>{79486255-55f2-43a5-a224-fec8d77c2853}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -25,21 +25,6 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="targetver.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="NetworkModule.h">
-      <Filter>소스 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="RingBuffer.h">
-      <Filter>소스 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="PacketPool.h">
-      <Filter>소스 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="MemoryPool.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="LockFreeStack.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="lib\CrashDump.h">
@@ -54,24 +39,27 @@
     <ClInclude Include="lib\System_Log.h">
       <Filter>소스 파일\lib</Filter>
     </ClInclude>
+    <ClInclude Include="PacketPool.h">
+      <Filter>소스 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="RingBuffer.h">
+      <Filter>소스 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="LanServer.h">
+      <Filter>소스 파일</Filter>
+    </ClInclude>
     <ClInclude Include="LockFreeQueue.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="LockFreeStack.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="MemoryPool.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="NetworkModule.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="RingBuffer.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="PacketPool.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
-    <ClCompile Include="IOCP_ECHO_ClassVer_LF.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="lib\APIHook.cpp">
@@ -82,6 +70,18 @@
     </ClCompile>
     <ClCompile Include="lib\System_Log.cpp">
       <Filter>소스 파일\lib</Filter>
+    </ClCompile>
+    <ClCompile Include="PacketPool.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="RingBuffer.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="LanServer.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="CLanServer_test.cpp">
+      <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

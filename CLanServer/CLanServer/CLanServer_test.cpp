@@ -1,12 +1,12 @@
-// IOCP_ECHO_ClassVer.cpp : 콘솔 응용 프로그램에 대한 진입점을 정의합니다.
+// CLanServer.cpp : 콘솔 응용 프로그램에 대한 진입점을 정의합니다.
 //
 
 #include "stdafx.h"
-#include "NetworkModule.h"
+#include "LanServer.h"
 
 CCrashDump Dump;
 
-class ECHO:public CLanServer
+class ECHO :public CLanServer
 {
 public:
 	ECHO (void)
@@ -21,8 +21,8 @@ public:
 	{
 		INT64 Num;
 		*p >> Num;
-		
-		Packet *Pack = Packet::Alloc();
+
+		Packet *Pack = Packet::Alloc ();
 		*Pack << Num;
 
 		SendPacket (SessionID, Pack);
@@ -39,11 +39,11 @@ public:
 	{
 		INT64 Data = 0x7FFFFFFFFFFFFFFF;
 
-		Packet *Pack = Packet::Alloc();
+		Packet *Pack = Packet::Alloc ();
 		*Pack << Data;
 
 		SendPacket (SessionID, Pack);
-		
+
 
 		Packet::Free (Pack);
 
@@ -57,10 +57,10 @@ public:
 
 ECHO Network;
 
-int main()
+int main ()
 {
 	wprintf (L"MainThread Start\n");
-	Network.Start (L"192.168.10.112", 6000, 200, 3);
+	Network.Start (L"127.0.0.1", 6000, 200, 3);
 
 
 	UINT AcceptTotal = 0;
@@ -94,13 +94,13 @@ int main()
 			RecvTPS = Network.RecvTPS (true);
 			SendTPS = Network.SendTPS (true);
 			ConnectSessionCnt = Network.Use_SessionCnt ();
-			MemoryPoolCnt =Network.Full_MemPoolCnt ();
+			MemoryPoolCnt = Network.Full_MemPoolCnt ();
 			MemoryPoolUse = Network.Alloc_MemPoolCnt ();
 
 			StartTime = EndTime;
 		}
 
-		
+
 		if ( GetAsyncKeyState ('E') & 0x8001 )
 		{
 			Network.Stop ();
@@ -111,7 +111,7 @@ int main()
 		/*
 		else if ( GetAsyncKeyState ('S') & 0x8001 )
 		{
-			Network.Start (L"127.0.0.1", 6000, 200, 3);
+		Network.Start (L"127.0.0.1", 6000, 200, 3);
 		}
 		*/
 
@@ -119,6 +119,6 @@ int main()
 	}
 
 
-    return 0;
+	return 0;
 }
 
