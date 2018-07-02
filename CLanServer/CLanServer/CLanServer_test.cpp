@@ -3,6 +3,7 @@
 
 #include "stdafx.h"
 #include "LanServer.h"
+#include "ServerConfig.h"
 
 CCrashDump Dump;
 
@@ -16,7 +17,14 @@ public:
 	{
 		Stop ();
 	}
+	virtual void OnStart ()
+	{
 
+	}
+	virtual void OnStop ()
+	{
+
+	}
 	virtual void OnRecv (UINT64 SessionID, Packet *p)
 	{
 		INT64 Num;
@@ -59,6 +67,10 @@ ECHO Network;
 
 int main ()
 {
+	LOG_DIRECTORY (L"LOG_FILE");
+	LOG_LEVEL (LOG_WARNING, false);
+
+	CServerConfig::Initialize ();
 	wprintf (L"MainThread Start\n");
 	Network.Start (L"127.0.0.1", 6000, 200, 3);
 

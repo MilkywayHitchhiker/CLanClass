@@ -57,6 +57,12 @@
     <ClInclude Include="MemoryPool.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
+    <ClInclude Include="ServerConfig.h">
+      <Filter>소스 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Parser.h">
+      <Filter>소스 파일</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -81,6 +87,12 @@
       <Filter>소스 파일</Filter>
     </ClCompile>
     <ClCompile Include="CLanServer_test.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="ServerConfig.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
+    <ClCompile Include="Parser.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
   </ItemGroup>
