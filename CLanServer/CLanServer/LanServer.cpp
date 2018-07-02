@@ -1,6 +1,6 @@
 #include"stdafx.h"
 #include "LanServer.h"
-#include "ServerConfig.h"
+//#include "ServerConfig.h"
 #define MAKE_i64(hi, lo)    (  (LONGLONG(DWORD(hi) & 0xffffffff) << 32 ) | LONGLONG(DWORD(lo) & 0xffffffff)  )
 
 /*======================================================================

@@ -70,9 +70,9 @@ int main ()
 	LOG_DIRECTORY (L"LOG_FILE");
 	LOG_LEVEL (LOG_WARNING, false);
 
-	CServerConfig::Initialize ();
+//	CServerConfig::Initialize ();
 	wprintf (L"MainThread Start\n");
-	Network.Start (L"127.0.0.1", 6000, 200, 3);
+	Network.Start (L"127.0.0.1", 6000, 200, 10);
 
 
 	UINT AcceptTotal = 0;

@@ -2,7 +2,7 @@
 #include <windows.h>
 #include "PacketPool.h"
 
-#include"ServerConfig.h"
+//#include"ServerConfig.h"
 
 CMemoryPool<Packet> *Packet::PacketPool;
 
@@ -103,9 +103,11 @@ void Packet::Initial(int iBufferSize)
 
 	InitializeSRWLock (&_CS);
 
+	/*
 	_PacketCode = _PACKET_CODE;
 	_XORCode1 = _PACKET_KEY1;
 	_XORCode2 = _PACKET_KEY2;
+	*/
 	srand (time (NULL));
 
 
@@ -433,7 +435,7 @@ bool Packet::EnCode (void)
 
 	HEADER Header;
 
-	Header.Code = _PACKET_CODE;
+	//Header.Code = _PACKET_CODE;
 	Header.Len = DataSize;
 
 	//1. Rand XOR Code 는 보내는 이가 랜덤하게 1byte 코드를 생성
