@@ -10,12 +10,15 @@ struct HEADER
 	unsigned char RandXOR;
 	unsigned char CheckSum;
 };
+<<<<<<< HEAD
 enum Errflag
 {
 	Get_Error,
 	Put_Error,
 	PutHeader_Error
 };
+=======
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 struct ErrorAlloc
 {
@@ -26,6 +29,15 @@ struct ErrorAlloc
 
 	int Flag;
 };
+<<<<<<< HEAD
+=======
+enum ThrowCase
+{
+	Get_Error = 1,
+	Put_Error = 2,
+	PutHeader_Error = 3
+};
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 class Packet
 {
@@ -41,6 +53,7 @@ public:
 			Packet();
 			Packet(int iBufferSize);
 			Packet(const Packet &SrcPacket);
+			Packet (unsigned char PacketCode,char XOR_Code1,char XOR_Code2,int iBufferSize);
 
 	virtual	~Packet();
 
@@ -169,10 +182,17 @@ private :
 
 	int	PutHeader (char *chpSrc, int iSrcSize);
 
+<<<<<<< HEAD
 	static unsigned char _PacketCode;
 	static unsigned char _XORCode1;
 	static unsigned char _XORCode2;
 	bool EnCodeFlag = false;
+=======
+	unsigned char _PacketCode;
+	char _XORCode1;
+	char _XORCode2;
+	bool _EnCodeFlag;
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 
 	bool EnCode (void);

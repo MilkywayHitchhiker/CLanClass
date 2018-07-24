@@ -11,7 +11,6 @@
 #include "RingBuffer.h"
 #include "LockFreeStack.h"
 #include "LockFreeQueue.h"
-
 /*======================================================================
 //NET Server Module
 //해당 클래스는 TCP모듈 클래스로 필요한 경우 상속받아서 사용할것.
@@ -33,7 +32,7 @@ protected:
 		SOCKET sock;
 		UINT64 SessionID;
 
-		
+
 		long SendFlag = FALSE;
 		bool SendDisconnect = FALSE;
 		CQueue_LF<Packet *> SendQ;
@@ -42,7 +41,7 @@ protected:
 
 		CRingbuffer RecvQ;
 		OVERLAPPED RecvOver;
-		
+
 	};
 
 	HANDLE _IOCP;
@@ -69,7 +68,7 @@ protected:
 	//인자 : 없음
 	======================================================================*/
 	CLanServer (void);
-	
+
 	/*======================================================================
 	//파괴자
 	//인자 : 없음
@@ -101,7 +100,7 @@ protected:
 	//인자 : WCHAR * IP, int 포트번호
 	//리턴 : 성공여부
 	======================================================================*/
-	bool InitializeNetwork (WCHAR *IP,int PORT);
+	bool InitializeNetwork (WCHAR *IP, int PORT);
 
 
 
@@ -122,7 +121,7 @@ protected:
 	======================================================================*/
 	UINT64 CreateSessionID (short index, UINT64 Unique)
 	{
-			return ((UINT64)index << 48) | (Unique);
+		return (( UINT64 )index << 48) | (Unique);
 	}
 
 
@@ -134,7 +133,7 @@ protected:
 	======================================================================*/
 	short indexSessionID (UINT64 SessionID)
 	{
-		return (short)(SessionID >> 48);
+		return ( short )(SessionID >> 48);
 	}
 
 
@@ -153,7 +152,11 @@ protected:
 	//인자 : Session *
 	//리턴 : 없음
 	======================================================================*/
+<<<<<<< HEAD
 	void PostSend (Session *p,bool Disconnect = false);
+=======
+	void PostSend (Session *p, bool Disconnect = false);
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 
 	/*======================================================================
@@ -173,7 +176,11 @@ protected:
 	======================================================================*/
 	void IODecrement (Session *p);
 
+<<<<<<< HEAD
 public :
+=======
+public:
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 	/*======================================================================
 	//OnStart
 	//설명 : virtual 함수. NetServer가 Start될때 같이 호출된다.
@@ -273,7 +280,7 @@ public :
 		UINT RecvTPS = _RecvPacketTPS;
 		if ( Reset )
 		{
-			InterlockedExchange ((volatile LONG *)&_RecvPacketTPS, 0);
+			InterlockedExchange (( volatile LONG * )&_RecvPacketTPS, 0);
 		}
 		return RecvTPS;
 	}

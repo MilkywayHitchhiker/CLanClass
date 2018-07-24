@@ -2,6 +2,8 @@
 #include <windows.h>
 #include "PacketPool.h"
 
+//#include"ServerConfig.h"
+
 CMemoryPool<Packet> *Packet::PacketPool;
 unsigned char Packet::_PacketCode;
 unsigned char Packet::_XORCode1;
@@ -42,6 +44,31 @@ Packet::Packet(const Packet &SrcPacket) : Buffer (NULL),_iBufferSize (0), DataFi
 	return;
 }
 
+Packet::Packet (unsigned char PacketCode, char XOR_Code1, char XOR_Code2, int iBufferSize = 0)
+{
+
+	Buffer = NULL;
+	BufferExpansion = NULL;
+
+	_PacketCode = PacketCode;
+	_XORCode1 = XOR_Code1;
+	_XORCode2 = XOR_Code2;
+	srand (time (NULL));
+
+	//버퍼 사이즈를 입력하지 않는다면, 기본사이즈로 생성.
+	if ( iBufferSize == 0 )
+	{
+		Initial ();
+	}
+	else
+	{
+		Initial (iBufferSize);
+	}
+
+	return;
+}
+
+
 
 Packet::~Packet()
 {
@@ -63,7 +90,7 @@ void Packet::Initial(int iBufferSize)
 	InitializeSRWLock (&_CS);
 
 	_iBufferSize = iBufferSize;
-
+	_EnCodeFlag = false;
 	if ( NULL == Buffer )
 	{
 		if ( BUFFER_DEFAULT < _iBufferSize )
@@ -82,10 +109,23 @@ void Packet::Initial(int iBufferSize)
 	DataFieldEnd = Buffer + (_iBufferSize- HEADERSIZE_DEFAULT);
 	ReadPos = WritePos = HeaderStartPos = DataFieldStart;
 
+<<<<<<< HEAD
 	
 	srand (time (NULL));
 
 	DeCodeCount = 0;
+=======
+	InitializeSRWLock (&_CS);
+
+	/*
+	_PacketCode = _PACKET_CODE;
+	_XORCode1 = _PACKET_KEY1;
+	_XORCode2 = _PACKET_KEY2;
+	*/
+	srand (time (NULL));
+
+
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 	_iDataSize = 0;
 	HeaderSize = 0;
 	iRefCnt = 1;
@@ -318,7 +358,11 @@ Packet &Packet::operator >> (double &dValue)
 // 데이타 얻기.
 int Packet::GetData(char *chpDest, int iSize)
 {
+<<<<<<< HEAD
 
+=======
+	
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 	//얻고자 하는 만큼의 데이타가 없다면.
 	if ( iSize > _iDataSize )
 	{
@@ -401,16 +445,25 @@ bool Packet::EnCode (void)
 	char *ReadPosBuff;
 	
 	AcquireLOCK ();
+<<<<<<< HEAD
 	if ( EnCodeFlag )
+=======
+	if ( _EnCodeFlag )
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 	{
 		ReleaseLOCK ();
 		return true;
 	}
+<<<<<<< HEAD
 	EnCodeFlag = true;
+=======
+	_EnCodeFlag = true;
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 	int DataSize = _iDataSize;
 	unsigned char XORCode1 = _XORCode1;
 	unsigned char XORCode2 = _XORCode2;
+<<<<<<< HEAD
 
 	HEADER Header;
 
@@ -536,15 +589,147 @@ bool Packet::DeCode (HEADER *SrcHeader)
 	//5. Payload 를 checksum 공식으로 계산 후 패킷의 checksum 과 비교
 	ReadPosBuff = ReadPos;
 	unsigned int CheckSum = 0;
+=======
+
+	HEADER Header;
+
+	//Header.Code = _PACKET_CODE;
+	Header.Len = DataSize;
+
+	//1. Rand XOR Code 는 보내는 이가 랜덤하게 1byte 코드를 생성
+	Header.RandXOR = rand () % 255;
+
+	//2. CheckSum Payload 부분을 1byte 씩 모두 더해서 % 256 한 unsigned char 값
+	ReadPosBuff = ReadPos;
+	int CheckSum = 0;
 	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
 	{
 		CheckSum += ReadPosBuff[Cnt];
 	}
+	Header.CheckSum = CheckSum % 256;
+
+	//3. Rand XOR Code로 ChecSum, Payload 바이트 단위 xor
+	ReadPosBuff = ReadPos;
+	Header.CheckSum = Header.CheckSum ^ Header.RandXOR;
+	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
+	{
+		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ Header.RandXOR;
+	}
+
+	//4. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
+	ReadPosBuff = ReadPos;
+	Header.RandXOR = Header.RandXOR ^ XORCode1;
+	Header.CheckSum = Header.CheckSum ^ XORCode1;
+	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
+	{
+		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ XORCode1;
+	}
+
+	//5. 고정 XOR Code 2 로[Rand XOR Code, CheckSum, Payload] 를 XOR
+	ReadPosBuff = ReadPos;
+	Header.RandXOR = Header.RandXOR ^ XORCode2;
+	Header.CheckSum = Header.CheckSum ^ XORCode2;
+	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
+	{
+		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ XORCode2;
+	}
+
+	//지역변수 Buff의 Data를 HeaderPos로 옮김.
+	PutHeader ((char *)&Header.CheckSum, 1);
+	PutHeader (( char * )&Header.RandXOR, 1);
+	PutHeader (( char * )&Header.Len, 2);
+	PutHeader (( char * )&Header.Code, 1);
+
+
+	ReleaseLOCK ();
+
+	return true;
+}
+
+
+
+
+
+//===============================================================================================
+//= 받기 복호화 과정
+//1. 고정 XOR Code 2 로[Rand XOR Code, CheckSum, Payload] 를 XOR
+//2. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
+//3. Rand XOR Code 를 파악.
+//4. Rand XOR Code 로[CheckSum - Payload] 바이트 단위 xor
+//5. Payload 를 checksum 공식으로 계산 후 패킷의 checksum 과 비교
+//===============================================================================================
+bool Packet::DeCode (HEADER *SrcHeader)
+{
+	HEADER Buff;
+	if ( SrcHeader == NULL )
+	{
+		GetData (( char * )&Buff.Code, 1);
+		GetData (( char * )&Buff.Len, 2);
+		GetData (( char * )&Buff.RandXOR, 1);
+		GetData (( char * )&Buff.CheckSum, 1);
+	}
+	else
+	{
+		Buff.CheckSum = SrcHeader->CheckSum;
+		Buff.Code = SrcHeader->Code;
+		Buff.Len = SrcHeader->Len;
+		Buff.RandXOR = SrcHeader->RandXOR;
+	}
+
+	unsigned char XORCode1 = _XORCode1;
+	unsigned char XORCode2 = _XORCode2;
+	char *ReadPosBuff = ReadPos;
+	int DataSize = _iDataSize;
+
+
+	//1. 고정 XOR Code 2 로[Rand XOR Code, CheckSum, Payload] 를 XOR
+	Buff.RandXOR = Buff.RandXOR ^ XORCode2;
+	Buff.CheckSum = Buff.CheckSum ^ XORCode2;
+	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
+	{
+		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ XORCode2;
+	}
+
+
+	//2. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
+	ReadPosBuff = ReadPos;
+	Buff.RandXOR = Buff.RandXOR ^ XORCode1;
+	Buff.CheckSum = Buff.CheckSum ^ XORCode1;
+	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
+	{
+		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ XORCode1;
+	}
+
+
+	//3. Rand XOR Code 를 파악.
+	//4. Rand XOR Code 로[CheckSum - Payload] 바이트 단위 xor
+	ReadPosBuff = ReadPos;
+	Buff.CheckSum = Buff.CheckSum ^ Buff.RandXOR;
+	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
+	{
+		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ Buff.RandXOR;
+	}
+
+	//5. Payload 를 checksum 공식으로 계산 후 패킷의 checksum 과 비교
+	ReadPosBuff = ReadPos;
+	int CheckSum = 0;
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
+	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
+	{
+		CheckSum += ReadPosBuff[Cnt];
+	}
+<<<<<<< HEAD
 	unsigned char Chk = ( unsigned char )CheckSum;
 
 	if ( Buff.CheckSum != Chk )
 	{
 		CCrashDump::Crash ();
+=======
+	unsigned char Chk = ( unsigned char )CheckSum % 256;
+
+	if ( Buff.CheckSum != Chk )
+	{
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 		return false;
 	}
 	return true;

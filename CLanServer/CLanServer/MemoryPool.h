@@ -22,7 +22,11 @@
 #include <Windows.h>
 #include <new.h>
 
+<<<<<<< HEAD
 #define TLS_basicChunkSize 4000
+=======
+#define TLS_basicChunkSize 1000
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 
 
@@ -526,7 +530,7 @@ private:
 		}
 		~Chunk ()
 		{
-			free (_pArray);
+
 		}
 
 		bool ChunkSetting (int iBlockNum, CMemoryPool_TLS<DATA> *pManager)
@@ -544,7 +548,7 @@ private:
 
 			FullCnt = iBlockNum;
 			_pMain_Manager = pManager;
-			_pArray = ( st_BLOCK_NODE * )malloc (sizeof (st_BLOCK_NODE) *iBlockNum);
+			_pArray = ( st_BLOCK_NODE * )malloc (sizeof (st_BLOCK_NODE) * iBlockNum);
 
 
 			for ( int Cnt = 0; Cnt < iBlockNum; Cnt++ )
@@ -597,7 +601,12 @@ private:
 
 			if ( Cnt == FullCnt )
 			{
+<<<<<<< HEAD
 				_pMain_Manager->Chunk_Free (this);
+=======
+				free (_pArray);
+				free(this);
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 			}
 
 			return true;
@@ -653,7 +662,22 @@ public:
 			pChunk = (Chunk<DATA> *)malloc (sizeof (Chunk<DATA>));
 			pChunk->ChunkSetting (Chunk_in_BlockCnt, this);
 
+<<<<<<< HEAD
 			TlsSetValue (TlsNum, pChunk);
+=======
+			pChunkNode = ( st_Chunk_NODE  * )malloc (sizeof (st_Chunk_NODE));
+			pChunkNode->pChunk = (Chunk<DATA> *)malloc (sizeof (Chunk<DATA>));
+
+			pChunkNode->ThreadID = GetCurrentThreadId ();
+			pChunkNode->pChunk->ChunkSetting (Chunk_in_BlockCnt, this);
+
+			TlsSetValue (TlsNum, pChunkNode);
+
+			pChunkNode->pNextNode = _pTopNode;
+			_pTopNode = pChunkNode;
+
+			InterlockedAdd (( volatile long * )&m_iBlockCount, Chunk_in_BlockCnt);
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 			InterlockedIncrement (( volatile long * )&m_iBlockCount);
 		}
@@ -692,7 +716,29 @@ public:
 	========================================================================*/
 	void Chunk_Alloc ()
 	{
+<<<<<<< HEAD
 		TlsSetValue (TlsNum, NULL);
+=======
+		st_Chunk_NODE *pPreTopNode = _pTopNode;
+		DWORD ThreadID = GetCurrentThreadId ();
+
+		while ( 1 )
+		{
+			if ( pPreTopNode->ThreadID == ThreadID )
+			{
+				pPreTopNode->pChunk = (Chunk<DATA> *)malloc (sizeof (Chunk<DATA>));
+				pPreTopNode->pChunk->ChunkSetting (Chunk_in_BlockCnt, this);
+				break;
+			}
+			//청크 블록을 교체하는데 해당 스레드가 존재하지 않는 스레드라면 문제가 되므로 크래쉬를 유도시켜 덤프 남길것.
+			else if ( pPreTopNode == NULL )
+			{
+				CCrashDump::Crash ();
+				return;
+			}
+			pPreTopNode = pPreTopNode->pNextNode;
+		}
+>>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 		return;
 	}
 	void Chunk_Free (Chunk<DATA> *pChunk)
