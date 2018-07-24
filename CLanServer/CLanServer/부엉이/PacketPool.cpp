@@ -3,10 +3,6 @@
 #include "PacketPool.h"
 
 CMemoryPool<Packet> *Packet::PacketPool;
-unsigned char Packet::_PacketCode;
-unsigned char Packet::_XORCode1;
-unsigned char Packet::_XORCode2;
-
 
 
 Packet::Packet() : Buffer (NULL),DataFieldStart (NULL),DataFieldEnd (NULL),ReadPos (NULL),WritePos (NULL)
@@ -58,10 +54,6 @@ Packet::~Packet()
 // 패킷 초기화.
 void Packet::Initial(int iBufferSize)
 {
-
-
-	InitializeSRWLock (&_CS);
-
 	_iBufferSize = iBufferSize;
 
 	if ( NULL == Buffer )
@@ -80,23 +72,14 @@ void Packet::Initial(int iBufferSize)
 
 	DataFieldStart = Buffer+HEADERSIZE_DEFAULT;
 	DataFieldEnd = Buffer + (_iBufferSize- HEADERSIZE_DEFAULT);
+
 	ReadPos = WritePos = HeaderStartPos = DataFieldStart;
 
-	
-	srand (time (NULL));
-
-	DeCodeCount = 0;
 	_iDataSize = 0;
 	HeaderSize = 0;
 	iRefCnt = 1;
 	
 	return;
-}
-void Packet::NetHeader_Initial (unsigned char PacketCode, unsigned char XOR1, unsigned char XOR2)
-{
-	 _PacketCode = PacketCode;
-	 _XORCode1 = XOR1;
-	 _XORCode2 = XOR2;
 }
 
 //RefCnt를 1 증가시킴. 
@@ -197,12 +180,6 @@ Packet &Packet::operator << (char chValue)
 	return *this;
 }
 
-Packet &Packet::operator << (WCHAR &chValue)
-{
-	PutData (( char * )&chValue, sizeof (WCHAR));
-	return *this;
-}
-
 Packet &Packet::operator << (short shValue)
 {
 	PutData(( char * )&shValue, sizeof(short));
@@ -261,12 +238,6 @@ Packet &Packet::operator >> (char &chValue)
 	return *this;
 }
 
-Packet &Packet::operator >> (WCHAR &chValue)
-{
-	GetData ((char *)&chValue, sizeof (WCHAR));
-	return *this;
-}
-
 Packet &Packet::operator >> (short &shValue)
 {
 	GetData((char *)&shValue, sizeof(short));
@@ -318,23 +289,15 @@ Packet &Packet::operator >> (double &dValue)
 // 데이타 얻기.
 int Packet::GetData(char *chpDest, int iSize)
 {
-
 	//얻고자 하는 만큼의 데이타가 없다면.
 	if ( iSize > _iDataSize )
-	{
-		ErrorAlloc err;
-		err.PutSize = 0;
-		err.UseHeaderSize = 0;
-		err.GetSize = iSize;
-		err.UseDataSize = _iDataSize;
-		err.Flag = Get_Error;
-		throw err;
-	}
+		return 0;
 
 	memcpy(chpDest, ReadPos, iSize);
 	ReadPos += iSize;
 
 	_iDataSize -= iSize;
+
 	return iSize;
 
 }
@@ -345,19 +308,11 @@ int Packet::PutData(char *chpSrc, int iSrcSize)
 {
 	//넣을 자리가 없다면.
 	if ( WritePos + iSrcSize > DataFieldEnd )
-	{
-			ErrorAlloc err;
-			err.GetSize = 0;
-			err.UseHeaderSize = 0;
-			err.PutSize = iSrcSize;
-			err.UseDataSize = _iDataSize;
-
-			err.Flag = Put_Error;
-			throw err;
-	}
+		return 0;
 
 	memcpy(WritePos, chpSrc, iSrcSize);
 	WritePos += iSrcSize;
+
 	_iDataSize += iSrcSize;
 
 	return iSrcSize;
@@ -366,186 +321,14 @@ int Packet::PutData(char *chpSrc, int iSrcSize)
 // 헤더 삽입.
 int	Packet::PutHeader (char *chpSrc, int iSrcSize)
 {
-	if ( iSrcSize > HEADERSIZE_DEFAULT - HeaderSize )
-	{
-		ErrorAlloc err;
-		err.GetSize = 0;
-		err.PutSize = 0;
-		err.UseDataSize = _iDataSize;
-		err.UseHeaderSize = HeaderSize;
-		err.Flag = PutHeader_Error;
-		throw err;
-	}
-		
+	if ( HeaderStartPos - iSrcSize < Buffer )
+		return 0;
+
 	char *PrePos = HeaderStartPos - iSrcSize;
 	memcpy (PrePos, chpSrc, iSrcSize);
 	HeaderStartPos = PrePos;
 
 	_iDataSize += iSrcSize;
-	HeaderSize += iSrcSize;
-	return  HeaderSize;
-}
 
-
-
-//===============================================================================================
-//= 보내기 암호화 과정
-//1. Rand XOR Code 생성
-//2. Payload 의 checksum 계산
-//3. Rand XOR Code 로[CheckSum, Payload] 바이트 단위 xor
-//4. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-//5. 고정 XOR Code 2 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-//===============================================================================================
-bool Packet::EnCode (void)
-{
-	char *ReadPosBuff;
-	
-	AcquireLOCK ();
-	if ( EnCodeFlag )
-	{
-		ReleaseLOCK ();
-		return true;
-	}
-	EnCodeFlag = true;
-
-	int DataSize = _iDataSize;
-	unsigned char XORCode1 = _XORCode1;
-	unsigned char XORCode2 = _XORCode2;
-
-	HEADER Header;
-
-	Header.Code = _PacketCode;
-	Header.Len = DataSize;
-
-	//1. Rand XOR Code 는 보내는 이가 랜덤하게 1byte 코드를 생성
-	Header.RandXOR = rand () % 256;
-
-	//2. CheckSum Payload 부분을 1byte 씩 모두 더해서 % 256 한 unsigned char 값
-	ReadPosBuff = ReadPos;
-	int CheckSum = 0;
-	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
-	{
-		CheckSum += ReadPosBuff[Cnt];
-	}
-	Header.CheckSum = CheckSum % 256;
-
-	//3. Rand XOR Code로 ChecSum, Payload 바이트 단위 xor
-	ReadPosBuff = ReadPos;
-	Header.CheckSum = Header.CheckSum ^ Header.RandXOR;
-	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
-	{
-		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ Header.RandXOR;
-	}
-
-	//4. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-	ReadPosBuff = ReadPos;
-	Header.RandXOR = Header.RandXOR ^ XORCode1;
-	Header.CheckSum = Header.CheckSum ^ XORCode1;
-	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
-	{
-		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ XORCode1;
-	}
-
-	//5. 고정 XOR Code 2 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-	ReadPosBuff = ReadPos;
-	Header.RandXOR = Header.RandXOR ^ XORCode2;
-	Header.CheckSum = Header.CheckSum ^ XORCode2;
-	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
-	{
-		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ XORCode2;
-	}
-
-	//지역변수 Buff의 Data를 HeaderPos로 옮김.
-	PutHeader (( char * )&Header.CheckSum, 1);
-	PutHeader (( char * )&Header.RandXOR, 1);
-	PutHeader (( char * )&Header.Len, 2);
-	PutHeader (( char * )&Header.Code, 1);
-
-
-	ReleaseLOCK ();
-
-	return true;
-}
-
-
-
-
-
-//===============================================================================================
-//= 받기 복호화 과정
-//1. 고정 XOR Code 2 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-//2. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-//3. Rand XOR Code 를 파악.
-//4. Rand XOR Code 로[CheckSum - Payload] 바이트 단위 xor
-//5. Payload 를 checksum 공식으로 계산 후 패킷의 checksum 과 비교
-//===============================================================================================
-bool Packet::DeCode (HEADER *SrcHeader)
-{
-	INT64 Cnt = InterlockedIncrement64 ((volatile INT64 *) &DeCodeCount);
-
-	HEADER Buff;
-	if ( SrcHeader == NULL )
-	{
-	//	GetData (( char * )&Buff.Code, 1);
-	//	GetData (( char * )&Buff.Len, 2);
-		GetData (( char * )&Buff.RandXOR, 1);
-		GetData (( char * )&Buff.CheckSum, 1);
-	}
-	else
-	{
-		Buff.CheckSum = SrcHeader->CheckSum;
-		Buff.Code = SrcHeader->Code;
-		Buff.Len = SrcHeader->Len;
-		Buff.RandXOR = SrcHeader->RandXOR;
-	}
-
-	unsigned char XORCode1 = _XORCode1;
-	unsigned char XORCode2 = _XORCode2;
-	char *ReadPosBuff = ReadPos;
-	int DataSize = _iDataSize;
-
-
-	//1. 고정 XOR Code 2 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-	Buff.RandXOR = Buff.RandXOR ^ XORCode2;
-	Buff.CheckSum = Buff.CheckSum ^ XORCode2;
-	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
-	{
-		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ XORCode2;
-	}
-
-
-	//2. 고정 XOR Code 1 로[Rand XOR Code, CheckSum, Payload] 를 XOR
-	ReadPosBuff = ReadPos;
-	Buff.RandXOR = Buff.RandXOR ^ XORCode1;
-	Buff.CheckSum = Buff.CheckSum ^ XORCode1;
-	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
-	{
-		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ XORCode1;
-	}
-
-
-	//3. Rand XOR Code 를 파악.
-	//4. Rand XOR Code 로[CheckSum - Payload] 바이트 단위 xor
-	ReadPosBuff = ReadPos;
-	Buff.CheckSum = Buff.CheckSum ^ Buff.RandXOR;
-	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
-	{
-		ReadPosBuff[Cnt] = ReadPosBuff[Cnt] ^ Buff.RandXOR;
-	}
-
-	//5. Payload 를 checksum 공식으로 계산 후 패킷의 checksum 과 비교
-	ReadPosBuff = ReadPos;
-	unsigned int CheckSum = 0;
-	for ( int Cnt = 0; Cnt < DataSize; Cnt++ )
-	{
-		CheckSum += ReadPosBuff[Cnt];
-	}
-	unsigned char Chk = ( unsigned char )CheckSum;
-
-	if ( Buff.CheckSum != Chk )
-	{
-		CCrashDump::Crash ();
-		return false;
-	}
-	return true;
+	return  iSrcSize;
 }

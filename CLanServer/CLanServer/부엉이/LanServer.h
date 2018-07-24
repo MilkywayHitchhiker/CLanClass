@@ -13,7 +13,7 @@
 #include "LockFreeQueue.h"
 
 /*======================================================================
-//NET Server Module
+//LAN Server Module
 //해당 클래스는 TCP모듈 클래스로 필요한 경우 상속받아서 사용할것.
 ======================================================================*/
 class CLanServer
@@ -35,7 +35,6 @@ protected:
 
 		
 		long SendFlag = FALSE;
-		bool SendDisconnect = FALSE;
 		CQueue_LF<Packet *> SendQ;
 		OVERLAPPED SendOver;
 		CStack_LF<Packet *> SendPack;
@@ -57,7 +56,7 @@ protected:
 	UINT _SendPacketTPS;
 	UINT _AcceptTotal;
 	UINT _AcceptTPS;
-	int _Use_Session_Cnt;
+	UINT _Use_Session_Cnt;
 
 	HANDLE *Thread;
 	int _WorkerThread_Num;
@@ -153,7 +152,8 @@ protected:
 	//인자 : Session *
 	//리턴 : 없음
 	======================================================================*/
-	void PostSend (Session *p,bool Disconnect = false);
+	void PostSend (Session *p);
+
 
 
 	/*======================================================================
@@ -174,20 +174,7 @@ protected:
 	void IODecrement (Session *p);
 
 public :
-	/*======================================================================
-	//OnStart
-	//설명 : virtual 함수. NetServer가 Start될때 같이 호출된다.
-	//인자 : 없음
-	//리턴 : 없음
-	======================================================================*/
-	virtual void OnStart (void) = 0;
-	/*======================================================================
-	//OnStart
-	//설명 : virtual 함수. NetServer가 Stop될때 같이 호출된다.
-	//인자 : 없음
-	//리턴 : 없음
-	======================================================================*/
-	virtual void OnStop (void) = 0;
+
 	/*======================================================================
 	//OnRecv
 	//설명 : virtual 함수. 패킷이 Recv되면 해당 함수가 호출된다.
@@ -329,7 +316,7 @@ public :
 	//인자 : 없음
 	//리턴 : UINT
 	======================================================================*/
-	int Use_SessionCnt (void)
+	UINT Use_SessionCnt (void)
 	{
 		return _Use_Session_Cnt;
 	}
@@ -340,7 +327,7 @@ public :
 	//인자 : 없음
 	//리턴 : double
 	======================================================================*/
-	INT64 Full_MemPoolCnt (void)
+	int Full_MemPoolCnt (void)
 	{
 		return Packet::PacketPool->GetFullCount ();
 	}
@@ -351,7 +338,7 @@ public :
 	//인자 : 없음
 	//리턴 : double
 	======================================================================*/
-	INT64 Alloc_MemPoolCnt (void)
+	int Alloc_MemPoolCnt (void)
 	{
 		return Packet::PacketPool->GetAllocCount ();
 	}

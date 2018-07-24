@@ -1,6 +1,5 @@
 #include"stdafx.h"
 #include "LanServer.h"
-#define MAKE_i64(hi, lo)    (  (LONGLONG(DWORD(hi) & 0xffffffff) << 32 ) | LONGLONG(DWORD(lo) & 0xffffffff)  )
 
 /*======================================================================
 //생성자
@@ -39,7 +38,8 @@ bool CLanServer::Start (WCHAR * ServerIP, int PORT, int Session_Max, int WorkerT
 		return false;
 	}
 
-
+	LOG_DIRECTORY (L"LOG_FILE");
+	LOG_LEVEL (LOG_SYSTEM, false);
 	wprintf (L"\n NetworkModule Start \n");
 
 	//소켓 초기화 및 Listen작업.
@@ -75,12 +75,7 @@ bool CLanServer::Start (WCHAR * ServerIP, int PORT, int Session_Max, int WorkerT
 	}
 
 	LOG_LOG (L"Network", LOG_SYSTEM, L" NetworkStart IP = %s, PORT = %d, SessionMax = %d, WorkerThreadNum = %d", ServerIP, PORT, Session_Max, WorkerThread_Num);
-
-	OnStart ();
-
 	bServerOn = true;
-
-
 	return true;
 }
 
@@ -106,7 +101,7 @@ bool CLanServer::Stop (void)
 	//세션 정리
 	for ( int Cnt = 0; Cnt < _Session_Max; Cnt++ )
 	{
-		if ( Session_Array[Cnt].p_IOChk.UseFlag == 1 )
+		if ( Session_Array[Cnt].p_IOChk.UseFlag == true )
 		{
 			shutdown (Session_Array[Cnt].sock, SD_BOTH);
 		}
@@ -125,7 +120,6 @@ bool CLanServer::Stop (void)
 	wprintf (L"\nNetworkModule End \n");
 
 	LOG_LOG (L"Network", LOG_SYSTEM, L" NetworkStop");
-	OnStop ();
 	bServerOn = false;
 	return true;
 }
@@ -141,6 +135,7 @@ bool CLanServer::Stop (void)
 ======================================================================*/
 void CLanServer::SendPacket (UINT64 SessionID, Packet *pack)
 {
+
 	Session *p = FindLockSession (SessionID);
 	if ( p == NULL )
 	{
@@ -283,7 +278,6 @@ void CLanServer::AcceptThread (void)
 		p->SessionID = CreateSessionID (Cnt, InterlockedIncrement64 (( volatile LONG64 * )&_SessionID_Count));
 		p->p_IOChk.UseFlag = true;
 		p->SendFlag = false;
-		p->SendDisconnect = false;
 
 		InterlockedIncrement (( volatile long * )&_Use_Session_Cnt);
 
@@ -301,11 +295,6 @@ void CLanServer::AcceptThread (void)
 			SessionRelease (p);
 			continue;
 		}
-
-		linger ling;
-		ling.l_onoff = 1;
-		ling.l_linger = 0;
-		setsockopt (p->sock, SOL_SOCKET, SO_LINGER, ( char * )&ling, sizeof (ling));
 
 		PostRecv (p);
 
@@ -364,6 +353,7 @@ void CLanServer::WorkerThread (void)
 
 		GQCS_Return = GetQueuedCompletionStatus (_IOCP, &Transferred, ( PULONG_PTR )&pSession, &pOver, INFINITE);
 
+		PROFILE_BEGIN (L"WorKerThread");
 
 		//IOCP 자체 에러부
 		if ( GQCS_Return == false && pOver == NULL )
@@ -408,6 +398,7 @@ void CLanServer::WorkerThread (void)
 			if ( pOver == &pSession->RecvOver )
 			{
 
+				PROFILE_BEGIN (L"recv");
 				pSession->RecvQ.MoveWritePos (Transferred);
 
 				//패킷 처리.
@@ -427,11 +418,11 @@ void CLanServer::WorkerThread (void)
 					//헤더가 맞지 않는다. shutdown걸고 빠짐.
 					if ( Header != 8 )
 					{
-						LOG_LOG (L"Network", LOG_DEBUG, L"SessionID 0x%p, Header %d", pSession->SessionID, Header);
+						LOG_LOG (L"Network", LOG_DEBUG, L"SessionID 0x%p, Header %d", pSession->SessionID,Header);
 						shutdown (pSession->sock, SD_BOTH);
 						break;
 					}
-
+					
 					//데이터가 전부 오지 않았다.
 					if ( Size < sizeof (Header) + Header )
 					{
@@ -440,9 +431,9 @@ void CLanServer::WorkerThread (void)
 
 					pSession->RecvQ.RemoveData (sizeof (Header));
 
-					Packet *Pack = Packet::Alloc ();
+					Packet *Pack = Packet::Alloc();
 
-					pSession->RecvQ.Get (Pack->GetBufferPtr (), Header);
+					pSession->RecvQ.Get (Pack->GetBufferPtr(),Header);
 
 					Pack->MoveWritePos (Header);
 
@@ -455,11 +446,13 @@ void CLanServer::WorkerThread (void)
 
 				PostRecv (pSession);
 
+				PROFILE_END (L"recv");
 
 			}
 			//Send일 경우
 			else if ( pOver == &pSession->SendOver )
 			{
+				PROFILE_BEGIN (L"send");
 				OnSend (pSession->SessionID, Transferred);
 
 				Packet *Pack;
@@ -471,27 +464,27 @@ void CLanServer::WorkerThread (void)
 					}
 					Packet::Free(Pack);
 				}
-				if ( pSession->SendDisconnect == TRUE )
+
+				
+				pSession->SendFlag = FALSE;
+
+
+				if ( pSession->SendQ.GetUseSize () > 0 )
 				{
-					shutdown (pSession->sock,SD_BOTH);
+					PostSend (pSession);
 				}
-				else
-				{
-					pSession->SendFlag = FALSE;
-					if ( pSession->SendQ.GetUseSize () > 0 )
-					{
-						PostSend (pSession);
-					}
-				}
-								
+				
 				InterlockedIncrement (( volatile LONG * )&_SendPacketTPS);
 
+				PROFILE_END (L"send");
 			}
 
 			IODecrement (pSession);
 		}
+		PROFILE_END (L"WorKerThread");
 	}
 
+	PROFILE_END (L"WorKerThread");
 }
 
 
@@ -538,13 +531,10 @@ bool CLanServer::InitializeNetwork (WCHAR *IP, int PORT)
 	retval = bind (_ListenSock, ( SOCKADDR * )&addr, sizeof (addr));
 	if ( retval == SOCKET_ERROR )
 	{
-		int SockErr = WSAGetLastError ();
-		LOG_LOG (L"Network", LOG_WARNING, L"bind Failed %d",SockErr);
+		LOG_LOG (L"Network", LOG_WARNING, L"bind Failed");
 		return false;
 	}
 
-	int optval = 0;
-	setsockopt (_ListenSock, SOL_SOCKET, SO_SNDBUF, ( char* )&optval, sizeof (optval));
 
 	//listen
 	retval = listen (_ListenSock, SOMAXCONN);
@@ -581,7 +571,7 @@ CLanServer::Session *CLanServer::FindLockSession (UINT64 SessionID)
 	//index로 찾은 해당 세션의 id가 내가 찾던 세션이 아닐 경우
 	if ( Session_Array[Cnt].p_IOChk.UseFlag == false  )
 	{
-		LOG_LOG (L"Network", LOG_DEBUG, L"Delete Session search = 0x%p, Array = 0x%p", SessionID, Session_Array[Cnt].SessionID);
+		LOG_LOG (L"Network", LOG_WARNING, L"Delete Session search = 0x%p, Array = 0x%p", SessionID, Session_Array[Cnt].SessionID);
 		IODecrement (&Session_Array[Cnt]);
 		return NULL;
 	}
@@ -589,7 +579,7 @@ CLanServer::Session *CLanServer::FindLockSession (UINT64 SessionID)
 	//세션 ID가 일치하지 않을 경우.
 	if ( Session_Array[Cnt].SessionID != SessionID )
 	{
-		LOG_LOG (L"Network", LOG_DEBUG, L"SessionID not match search = 0x%p, Array = 0x%p", SessionID, Session_Array[Cnt].SessionID);
+		LOG_LOG (L"Network", LOG_WARNING, L"SessionID not match search = 0x%p, Array = 0x%p", SessionID, Session_Array[Cnt].SessionID);
 		IODecrement (&Session_Array[Cnt]);
 		return NULL;
 	}
@@ -653,11 +643,11 @@ void CLanServer::PostRecv (Session * p)
 
 			if ( Errcode == WSAENOBUFS )
 			{
-				LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld WSAENOBUFS ERROR ", p->SessionID, Errcode);
+				LOG_LOG (L"Network", LOG_WARNING, L"SessionID = 0x%p, ErrorCode = %ld WSAENOBUFS ERROR ", p->SessionID, Errcode);
 			}
 			else
 			{
-				LOG_LOG (L"Network", LOG_DEBUG, L"SessionID = 0x%p, ErrorCode = %ld PostRecv", p->SessionID, Errcode);
+				LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld PostRecv", p->SessionID, Errcode);
 			}
 
 			shutdown (p->sock, SD_BOTH);
@@ -676,20 +666,13 @@ void CLanServer::PostRecv (Session * p)
 //인자 : Session *
 //리턴 : 없음
 ======================================================================*/
-void CLanServer::PostSend (Session *p, bool Disconnect)
+void CLanServer::PostSend (Session *p)
 {
-
+	int Cnt = 0;
 	DWORD SendByte;
 	DWORD dwFlag = 0;
 	int retval;
-
-	p->SendDisconnect = Disconnect;
-
-	if ( InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount) == 1 )
-	{
-		IODecrement (p);
-		return;
-	}
+	InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount);
 
 	if ( InterlockedCompareExchange (( volatile long * )&p->SendFlag, TRUE, FALSE) == TRUE )
 	{
@@ -698,8 +681,6 @@ void CLanServer::PostSend (Session *p, bool Disconnect)
 	}
 
 	//WSASend 셋팅 및 등록부
-
-	int Cnt = 0;
 	WSABUF buf[SendbufMax];
 
 	Packet *pack;
@@ -720,8 +701,8 @@ void CLanServer::PostSend (Session *p, bool Disconnect)
 
 	if ( Cnt == 0 )
 	{
-		p->SendFlag = FALSE;
 		IODecrement (p);
+		p->SendFlag = FALSE;
 		return;
 	}
 
@@ -738,19 +719,21 @@ void CLanServer::PostSend (Session *p, bool Disconnect)
 
 			if ( Errcode == WSAENOBUFS )
 			{
-				LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld WSAENOBUFS ERROR ", p->SessionID, Errcode);
+				LOG_LOG (L"Network", LOG_WARNING, L"SessionID = 0x%p, ErrorCode = %ld WSAENOBUFS ERROR ", p->SessionID, Errcode);
 			}
 			else
 			{
-				LOG_LOG (L"Network", LOG_DEBUG, L"SessionID = 0x%p, ErrorCode = %ld PostSend", p->SessionID, Errcode);
+				LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld PostSend", p->SessionID, Errcode);
 			}
 
 			shutdown (p->sock, SD_BOTH);
 			IODecrement (p);
+			PROFILE_END (L"postsend");
 		}
 	}
 	return;
 }
+
 
 
 /*======================================================================
@@ -764,19 +747,19 @@ void CLanServer::SessionRelease (Session * p)
 	IOChk ComChk;
 	ComChk.IOCount = 0;
 	ComChk.UseFlag = true;
-	INT64 ComBuf = MAKE_i64 (ComChk.UseFlag, ComChk.IOCount);
 	IOChk ExChk;
 	ExChk.IOCount = 0;
 	ExChk.UseFlag = false;
-	INT64 ExBuf = MAKE_i64 (ExChk.UseFlag, ExChk.IOCount);
-
+	
 	//IOCount와 UseFlag를 동시에 비교해서 IOCount가 0이고 UseFlag가 true일때만 Release진행. 
-	if ( !InterlockedCompareExchange64 (( volatile LONG64 * )&p->p_IOChk, ExBuf, ComBuf) )
+	if ( !InterlockedCompareExchange64 (( volatile LONG64 * )&p->p_IOChk, ( LONG64 )&ExChk, ( LONG64 )&ComChk))
 	{
 		return;
 	}
 
 	OnClientLeave (p->SessionID);
+
+	closesocket (p->sock);
 
 	p->RecvQ.ClearBuffer ();
 
@@ -803,16 +786,10 @@ void CLanServer::SessionRelease (Session * p)
 
 		Packet::Free (pack);
 	}
+	
 
-	int Cnt = InterlockedDecrement (( volatile long * )&_Use_Session_Cnt);
-	if ( Cnt < 0 )
-	{
-		LOG_LOG (L"Network", LOG_ERROR, L"_USE_Session_Error SessionID = %x, IOCount = %d, UseFlag = %d SessionCount = %d", p->SessionID, p->p_IOChk.IOCount, p->p_IOChk.UseFlag, Cnt);
-	}
+	InterlockedDecrement (( volatile long * )&_Use_Session_Cnt);
 
-
-
-	closesocket (p->sock);
 
 	emptySession.Push (indexSessionID (p->SessionID));
 

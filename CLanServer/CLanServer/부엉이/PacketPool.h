@@ -3,40 +3,15 @@
 #include <Windows.h>
 #include "MemoryPool.h"
 
-struct HEADER
-{
-	char Code;
-	short Len;
-	unsigned char RandXOR;
-	unsigned char CheckSum;
-};
-enum Errflag
-{
-	Get_Error,
-	Put_Error,
-	PutHeader_Error
-};
-
-struct ErrorAlloc
-{
-	int UseDataSize;
-	int GetSize;
-	int PutSize;
-	int UseHeaderSize;
-
-	int Flag;
-};
-
 class Packet
 {
 public:
-
-
 	enum PACKET
 	{
 		BUFFER_DEFAULT			= 10000,		// 패킷의 기본 버퍼 사이즈.
 		HEADERSIZE_DEFAULT		= 5
 	};
+
 	// 생성자, 파괴자.
 			Packet();
 			Packet(int iBufferSize);
@@ -82,8 +57,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	Packet	&operator << (BYTE byValue);
 	Packet	&operator << (char chValue);
-	Packet &operator << (WCHAR &chValue);
-
 
 	Packet	&operator << (short shValue);
 	Packet	&operator << (WORD wValue);
@@ -100,7 +73,6 @@ public:
 	//////////////////////////////////////////////////////////////////////////
 	Packet	&operator >> (BYTE &byValue);
 	Packet	&operator >> (char &chValue);
-	Packet &operator >> (WCHAR &chValue);
 
 	Packet	&operator >> (short &shValue);
 	Packet	&operator >> (WORD &wValue);
@@ -162,31 +134,11 @@ protected:
 	// 현재 Packet의 RefCnt
 	//------------------------------------------------------------
 	int iRefCnt;
-	INT64 DeCodeCount;
-	int AllocCount = 0;
+
 private :
 	static CMemoryPool<Packet> *PacketPool;
 
 	int	PutHeader (char *chpSrc, int iSrcSize);
-
-	static unsigned char _PacketCode;
-	static unsigned char _XORCode1;
-	static unsigned char _XORCode2;
-	bool EnCodeFlag = false;
-
-
-	bool EnCode (void);
-	bool DeCode (HEADER *SrcHeader = NULL);
-
-	void AcquireLOCK (void)
-	{
-		AcquireSRWLockExclusive (&_CS);
-	}
-	void ReleaseLOCK (void)
-	{
-		ReleaseSRWLockExclusive (&_CS);
-	}
-	SRWLOCK _CS;
 
 public :
 	
@@ -198,13 +150,11 @@ public :
 		}
 		return;
 	}
-	static void NetHeader_Initial (unsigned char PacketCode, unsigned char XOR1, unsigned char XOR2);
+	
 
 	static Packet *Alloc (void)
 	{
-		PROFILE_BEGIN (L"Alloc");
 		Packet *p = PacketPool->Alloc ();
-		PROFILE_END (L"Alloc");
 		return p;
 	}
 
@@ -213,28 +163,11 @@ public :
 		bool flag;
 		if ( InterlockedDecrement (( volatile long * )&p->iRefCnt) == 0 )
 		{
-			PROFILE_BEGIN (L"Free");
 			flag = PacketPool->Free (p);
-			PROFILE_END (L"Free");
 			return flag;
 		}
 		return true;
 	}
-	static INT64 PacketPool_Full ()
-	{
-		return PacketPool->GetFullCount ();
-	}
-
-	static INT64 PacketPool_Alloc ()
-	{
-		return PacketPool->GetAllocCount ();
-	}
-
-	static INT64 PacketPool_Free ()
-	{
-		return PacketPool->GetFreeCount ();
-	}
-
 	friend class CNetServer;
 	friend class CLanServer;
 

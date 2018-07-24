@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------
 
-	MemoryPool_Ver1.0
+	MemoryPool.
 
 	메모리 풀 클래스.
 	특정 데이타를 일정량 할당 후 나눠쓴다.
@@ -79,7 +79,6 @@ public:
 		// 메모리 풀 크기 설정
 		========================================================================*/
 		m_iBlockCount = iBlockNum;
-		m_iAllocCount = 0;
 		if ( iBlockNum < 0 )
 		{
 			CCrashDump::Crash ();
@@ -310,7 +309,6 @@ public:
 		// 메모리 풀 크기 설정
 		========================================================================*/
 		m_iBlockCount = iBlockNum;
-		m_iAllocCount = 0;
 		if ( iBlockNum < 0 )
 		{
 			CCrashDump::Crash ();
@@ -563,7 +561,7 @@ private:
 		//////////////////////////////////////////////////////
 		DATA	*Alloc (bool bPlacementNew = true)
 		{
-			int iBlockCount = ++_Top;
+			int iBlockCount = InterlockedIncrement (( volatile long * )&_Top);
 			st_BLOCK_NODE *stpBlock = &_pArray[iBlockCount - 1];
 
 			if ( bPlacementNew )
@@ -597,7 +595,7 @@ private:
 
 			if ( Cnt == FullCnt )
 			{
-				_pMain_Manager->Chunk_Free (this);
+				stpBlock->pChunk_Main->_pMain_Manager->Chunk_Free (this);
 			}
 
 			return true;
@@ -622,8 +620,6 @@ public:
 		Chunk_in_BlockCnt = iBlockNum;
 		TlsNum = TlsAlloc ();
 
-		m_iBlockCount = 0;
-		m_iAllocCount = 0;
 		//TLS가 생성이 불가한 상태이므로 자기자신을 파괴하고 종료.
 		if ( TlsNum == TLS_OUT_OF_INDEXES )
 		{
@@ -661,7 +657,7 @@ public:
 
 		DATA *pData = pChunk->Alloc ();
 
-	//	InterlockedIncrement (( volatile long * )&m_iAllocCount);
+		InterlockedIncrement (( volatile long * )&m_iAllocCount);
 
 		return pData;
 
@@ -678,7 +674,7 @@ public:
 		Chunk<DATA>::st_BLOCK_NODE *pNode = (Chunk<DATA>::st_BLOCK_NODE *) pDATA;
 
 		bool chk = pNode->pChunk_Main->Free (pDATA);
-//		InterlockedDecrement (( volatile long * )&m_iAllocCount);
+		InterlockedDecrement (( volatile long * )&m_iAllocCount);
 		return chk;
 	}
 public:
@@ -693,6 +689,7 @@ public:
 	void Chunk_Alloc ()
 	{
 		TlsSetValue (TlsNum, NULL);
+
 		return;
 	}
 	void Chunk_Free (Chunk<DATA> *pChunk)
@@ -708,15 +705,15 @@ public:
 	// 현재 사용중인 블럭 개수를 얻는다.
 	//
 	// ! 주의
-	//	TLS의 성능상 한계로 인해 사용되지 않음.
+	//	TLC의 성능상 한계로 인해 사용되지 않음.
 	//
 	// Parameters:	없음.
 	// Return:		(int) 사용중인 블럭 개수.
 	========================================================================*/
 	int		GetAllocCount (void)
 	{
-	//	return m_iAllocCount;
-		return 0;
+		return m_iAllocCount;
+		//return 0;
 	}
 	/*========================================================================
 	// 메모리풀 블럭 전체 개수를 얻는다.
@@ -733,15 +730,15 @@ public:
 	// 현재 보관중인 블럭 개수를 얻는다.
 	//
 	// ! 주의
-	//	TLS의 성능상 한계로 인해 사용되지 않음.
+	//	TLC의 성능상 한계로 인해 사용되지 않음.
 	//
 	// Parameters:	없음.
 	// Return:		(int) 보관중인 블럭 개수.
 	========================================================================*/
 	int		GetFreeCount (void)
 	{
-	//	return m_iBlockCount - m_iAllocCount;
-		return 0;
+		return m_iBlockCount - m_iAllocCount;
+	//	return 0;
 	}
 
 private:

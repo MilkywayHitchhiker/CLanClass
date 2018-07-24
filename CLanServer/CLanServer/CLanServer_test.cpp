@@ -16,7 +16,14 @@ public:
 	{
 		Stop ();
 	}
-
+	virtual void OnStart ()
+	{
+		return;
+	}
+	virtual void OnStop ()
+	{
+		return;
+	}
 	virtual void OnRecv (UINT64 SessionID, Packet *p)
 	{
 		INT64 Num;
@@ -59,8 +66,10 @@ ECHO Network;
 
 int main ()
 {
+	LOG_DIRECTORY (L"SYS_LOG");
+	LOG_LEVEL (LOG_WARNING,false);
 	wprintf (L"MainThread Start\n");
-	Network.Start (L"127.0.0.1", 6000, 200, 3);
+	Network.Start (L"127.0.0.1", 6000, 200, 9);
 
 
 	UINT AcceptTotal = 0;
@@ -68,8 +77,8 @@ int main ()
 	UINT RecvTPS = 0;
 	UINT SendTPS = 0;
 	UINT ConnectSessionCnt = 0;
-	int MemoryPoolCnt = 0;
-	int MemoryPoolUse = 0;
+	UINT64 MemoryPoolCnt = 0;
+	UINT64 MemoryPoolUse = 0;
 
 	DWORD StartTime = GetTickCount ();
 	DWORD EndTime;
@@ -84,8 +93,8 @@ int main ()
 			wprintf (L"AcceptTPS = %d \n", AcceptTPS);
 			wprintf (L"Sec RecvTPS = %d \n", RecvTPS);
 			wprintf (L"Sec SendTPS = %d \n", SendTPS);
-			wprintf (L"MemoryPoolFull Cnt = %d\n", MemoryPoolCnt);
-			wprintf (L"MemoryPoolUse Cnt = %d \n", MemoryPoolUse);
+			wprintf (L"MemoryPoolFull Cnt = %lld\n", MemoryPoolCnt);
+			wprintf (L"MemoryPoolUse Cnt = %lld \n", MemoryPoolUse);
 
 			wprintf (L"==========================\n");
 
