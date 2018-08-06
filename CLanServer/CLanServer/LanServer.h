@@ -35,7 +35,7 @@ protected:
 
 		long SendFlag = FALSE;
 		bool SendDisconnect = FALSE;
-		CQueue_LF<Packet *> SendQ;
+		CQueue_LOCK<Packet *> SendQ;
 		OVERLAPPED SendOver;
 		CStack_LF<Packet *> SendPack;
 

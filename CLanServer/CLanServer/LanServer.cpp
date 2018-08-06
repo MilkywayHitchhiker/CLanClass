@@ -725,11 +725,7 @@ void CLanServer::PostSend (Session *p, bool Disconnect)
 		return;
 	}
 
-	if ( InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount) == 1 )
-	{
-		IODecrement (p);
-		return;
-	}
+	InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount);
 
 	if ( InterlockedCompareExchange (( volatile long * )&p->SendFlag, TRUE, FALSE) == TRUE )
 	{

@@ -3,7 +3,7 @@
 
 #include "stdafx.h"
 #include "LanServer.h"
-#include "ServerConfig.h"
+//#include "ServerConfig.h"
 
 CCrashDump Dump;
 

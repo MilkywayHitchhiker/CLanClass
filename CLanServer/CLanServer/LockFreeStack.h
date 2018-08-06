@@ -116,8 +116,9 @@ public:
 
 		do
 		{
-			pPreTopNode.pTopNode = _pTop->pTopNode;
 			pPreTopNode.iUniqueNum = _pTop->iUniqueNum;
+			pPreTopNode.pTopNode = _pTop->pTopNode;
+
 			if ( pPreTopNode.pTopNode == NULL )
 			{
 				*pOutData = NULL;
