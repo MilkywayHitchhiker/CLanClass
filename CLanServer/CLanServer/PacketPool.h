@@ -10,15 +10,6 @@ struct HEADER
 	unsigned char RandXOR;
 	unsigned char CheckSum;
 };
-<<<<<<< HEAD
-enum Errflag
-{
-	Get_Error,
-	Put_Error,
-	PutHeader_Error
-};
-=======
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 struct ErrorAlloc
 {
@@ -29,15 +20,12 @@ struct ErrorAlloc
 
 	int Flag;
 };
-<<<<<<< HEAD
-=======
 enum ThrowCase
 {
 	Get_Error = 1,
 	Put_Error = 2,
 	PutHeader_Error = 3
 };
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 class Packet
 {
@@ -175,24 +163,16 @@ protected:
 	// ÇöÀç PacketÀÇ RefCnt
 	//------------------------------------------------------------
 	int iRefCnt;
-	INT64 DeCodeCount;
-	int AllocCount = 0;
+
 private :
 	static CMemoryPool<Packet> *PacketPool;
 
 	int	PutHeader (char *chpSrc, int iSrcSize);
 
-<<<<<<< HEAD
-	static unsigned char _PacketCode;
-	static unsigned char _XORCode1;
-	static unsigned char _XORCode2;
-	bool EnCodeFlag = false;
-=======
 	unsigned char _PacketCode;
 	char _XORCode1;
 	char _XORCode2;
 	bool _EnCodeFlag;
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 
 	bool EnCode (void);
@@ -218,13 +198,11 @@ public :
 		}
 		return;
 	}
-	static void NetHeader_Initial (unsigned char PacketCode, unsigned char XOR1, unsigned char XOR2);
+	
 
 	static Packet *Alloc (void)
 	{
-		PROFILE_BEGIN (L"Alloc");
 		Packet *p = PacketPool->Alloc ();
-		PROFILE_END (L"Alloc");
 		return p;
 	}
 
@@ -233,28 +211,11 @@ public :
 		bool flag;
 		if ( InterlockedDecrement (( volatile long * )&p->iRefCnt) == 0 )
 		{
-			PROFILE_BEGIN (L"Free");
 			flag = PacketPool->Free (p);
-			PROFILE_END (L"Free");
 			return flag;
 		}
 		return true;
 	}
-	static INT64 PacketPool_Full ()
-	{
-		return PacketPool->GetFullCount ();
-	}
-
-	static INT64 PacketPool_Alloc ()
-	{
-		return PacketPool->GetAllocCount ();
-	}
-
-	static INT64 PacketPool_Free ()
-	{
-		return PacketPool->GetFreeCount ();
-	}
-
 	friend class CNetServer;
 	friend class CLanServer;
 

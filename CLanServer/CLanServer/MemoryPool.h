@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------
 
-	MemoryPool_Ver1.0
+	MemoryPool.
 
 	메모리 풀 클래스.
 	특정 데이타를 일정량 할당 후 나눠쓴다.
@@ -22,11 +22,7 @@
 #include <Windows.h>
 #include <new.h>
 
-<<<<<<< HEAD
-#define TLS_basicChunkSize 4000
-=======
 #define TLS_basicChunkSize 1000
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 
 
@@ -83,7 +79,6 @@ public:
 		// 메모리 풀 크기 설정
 		========================================================================*/
 		m_iBlockCount = iBlockNum;
-		m_iAllocCount = 0;
 		if ( iBlockNum < 0 )
 		{
 			CCrashDump::Crash ();
@@ -273,6 +268,7 @@ private:
 	========================================================================*/
 	struct st_BLOCK_NODE
 	{
+		DATA Data;
 		st_BLOCK_NODE ()
 		{
 			stpNextBlock = NULL;
@@ -314,7 +310,6 @@ public:
 		// 메모리 풀 크기 설정
 		========================================================================*/
 		m_iBlockCount = iBlockNum;
-		m_iAllocCount = 0;
 		if ( iBlockNum < 0 )
 		{
 			CCrashDump::Crash ();
@@ -333,13 +328,13 @@ public:
 		{
 			m_bStoreFlag = false;
 
-			pNode = ( st_BLOCK_NODE * )malloc (sizeof (DATA) + sizeof (st_BLOCK_NODE));
+			pNode = ( st_BLOCK_NODE * )malloc (sizeof (st_BLOCK_NODE));
 			_pTop->pTopNode = pNode;
 			pPreNode = pNode;
 
 			for ( int iCnt = 1; iCnt < iBlockNum; iCnt++ )
 			{
-				pNode = ( st_BLOCK_NODE * )malloc (sizeof (DATA) + sizeof (st_BLOCK_NODE));
+				pNode = ( st_BLOCK_NODE * )malloc (sizeof (st_BLOCK_NODE));
 				pPreNode->stpNextBlock = pNode;
 				pPreNode = pNode;
 			}
@@ -375,7 +370,7 @@ public:
 		{
 			if ( m_bStoreFlag )
 			{
-				stpBlock = ( st_BLOCK_NODE * )malloc (sizeof (DATA) + sizeof (st_BLOCK_NODE));
+				stpBlock = ( st_BLOCK_NODE * )malloc (sizeof (st_BLOCK_NODE));
 				InterlockedIncrement64 (( LONG64 * )&m_iBlockCount);
 			}
 
@@ -400,9 +395,12 @@ public:
 			stpBlock = pPreTopNode.pTopNode;
 		}
 
-		if ( bPlacementNew )	new (( DATA * )(stpBlock + 1)) DATA;
+		if ( bPlacementNew )
+		{
+			new (( DATA * )&stpBlock->Data) DATA;
+		}
 
-		return ( DATA * )(stpBlock + 1);
+		return &stpBlock->Data;
 	}
 
 	/*========================================================================
@@ -423,7 +421,7 @@ public:
 			pPreTopNode.iUniqueNum = _pTop->iUniqueNum;
 			pPreTopNode.pTopNode = _pTop->pTopNode;
 
-			stpBlock = (( st_BLOCK_NODE * )pData - 1);
+			stpBlock = (( st_BLOCK_NODE * )pData);
 			stpBlock->stpNextBlock = _pTop->pTopNode;
 		} while ( !InterlockedCompareExchange128 (( volatile LONG64 * )_pTop, iUniqueNum, ( LONG64 )stpBlock, ( LONG64 * )&pPreTopNode) );
 
@@ -510,7 +508,7 @@ private:
 		{
 			DATA BLOCK;
 			INT64 Safe;
-			Chunk<DATA> *pChunk_Main;
+			Chunk *pChunk_Main;
 		};
 	private :
 
@@ -527,6 +525,7 @@ private:
 		////////////////////////////////////////////////////
 		Chunk ()
 		{
+
 		}
 		~Chunk ()
 		{
@@ -535,8 +534,6 @@ private:
 
 		bool ChunkSetting (int iBlockNum, CMemoryPool_TLS<DATA> *pManager)
 		{
-			_Top = 0;
-			FreeCnt = 0;
 			if ( iBlockNum < 0 )
 			{
 				CCrashDump::Crash ();
@@ -546,6 +543,8 @@ private:
 				iBlockNum = TLS_basicChunkSize;
 			}
 
+			_Top = 0;
+			FreeCnt = 0;
 			FullCnt = iBlockNum;
 			_pMain_Manager = pManager;
 			_pArray = ( st_BLOCK_NODE * )malloc (sizeof (st_BLOCK_NODE) * iBlockNum);
@@ -567,7 +566,7 @@ private:
 		//////////////////////////////////////////////////////
 		DATA	*Alloc (bool bPlacementNew = true)
 		{
-			int iBlockCount = ++_Top;
+			int iBlockCount = InterlockedIncrement (( volatile long * )&_Top);
 			st_BLOCK_NODE *stpBlock = &_pArray[iBlockCount - 1];
 
 			if ( bPlacementNew )
@@ -590,7 +589,7 @@ private:
 			st_BLOCK_NODE *stpBlock;
 
 
-			stpBlock = ( st_BLOCK_NODE * )pData;
+			stpBlock = (( st_BLOCK_NODE * )pData);
 
 			if ( stpBlock->Safe != SafeLane )
 			{
@@ -601,12 +600,8 @@ private:
 
 			if ( Cnt == FullCnt )
 			{
-<<<<<<< HEAD
-				_pMain_Manager->Chunk_Free (this);
-=======
 				free (_pArray);
 				free(this);
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 			}
 
 			return true;
@@ -614,9 +609,17 @@ private:
 		}
 	};
 
+	struct st_Chunk_NODE
+	{
+		Chunk<DATA> *pChunk;
+		DWORD ThreadID;
+		st_Chunk_NODE *pNextNode;
+	};
 
+	st_Chunk_NODE *_pTopNode;
 	int Chunk_in_BlockCnt;
 	DWORD TlsNum;
+	SRWLOCK _CS;
 public:
 	/*========================================================================
 	// 생성자
@@ -628,11 +631,11 @@ public:
 			iBlockNum = TLS_basicChunkSize;
 		}
 
+
+		_pTopNode = NULL;
 		Chunk_in_BlockCnt = iBlockNum;
 		TlsNum = TlsAlloc ();
 
-		m_iBlockCount = 0;
-		m_iAllocCount = 0;
 		//TLS가 생성이 불가한 상태이므로 자기자신을 파괴하고 종료.
 		if ( TlsNum == TLS_OUT_OF_INDEXES )
 		{
@@ -642,6 +645,22 @@ public:
 	}
 	~CMemoryPool_TLS ()
 	{
+		st_Chunk_NODE *pPreTopNode = _pTopNode;
+		st_Chunk_NODE *pdeleteTopNode = _pTopNode;
+		while ( 1 )
+		{
+			pPreTopNode = pPreTopNode->pNextNode;
+
+			free (pdeleteTopNode->pChunk);
+
+			free (pdeleteTopNode);
+
+			pdeleteTopNode = pPreTopNode;
+			if ( pdeleteTopNode == NULL )
+			{
+				break;
+			}
+		}
 		return;
 	}
 
@@ -654,17 +673,14 @@ public:
 	DATA *Alloc (bool bPlacemenenew = true)
 	{
 		//해당 스레드에서 최초 실행될때. 초기화 작업.
-		Chunk<DATA> *pChunk = (Chunk<DATA>  * )TlsGetValue (TlsNum);
+		st_Chunk_NODE *pChunkNode = ( st_Chunk_NODE  * )TlsGetValue (TlsNum);
 
-		if ( pChunk == NULL )
+
+
+		if ( pChunkNode == NULL )
 		{
 
-			pChunk = (Chunk<DATA> *)malloc (sizeof (Chunk<DATA>));
-			pChunk->ChunkSetting (Chunk_in_BlockCnt, this);
 
-<<<<<<< HEAD
-			TlsSetValue (TlsNum, pChunk);
-=======
 			pChunkNode = ( st_Chunk_NODE  * )malloc (sizeof (st_Chunk_NODE));
 			pChunkNode->pChunk = (Chunk<DATA> *)malloc (sizeof (Chunk<DATA>));
 
@@ -677,20 +693,19 @@ public:
 			_pTopNode = pChunkNode;
 
 			InterlockedAdd (( volatile long * )&m_iBlockCount, Chunk_in_BlockCnt);
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
-			InterlockedIncrement (( volatile long * )&m_iBlockCount);
 		}
 
 
-		DATA *pData = pChunk->Alloc ();
+		DATA *pData = pChunkNode->pChunk->Alloc ();
 
-	//	InterlockedIncrement (( volatile long * )&m_iAllocCount);
+
+		//InterlockedIncrement (( volatile long * )&m_iAllocCount);
 
 		return pData;
 
 	}
-
+	
 	/*========================================================================
 	// 사용중이던 블럭을 해제한다.
 	//
@@ -702,7 +717,8 @@ public:
 		Chunk<DATA>::st_BLOCK_NODE *pNode = (Chunk<DATA>::st_BLOCK_NODE *) pDATA;
 
 		bool chk = pNode->pChunk_Main->Free (pDATA);
-//		InterlockedDecrement (( volatile long * )&m_iAllocCount);
+	//		InterlockedDecrement (( volatile long * )&m_iAllocCount);
+	//		InterlockedIncrement (( volatile long * )&m_iFreeCount);
 		return chk;
 	}
 public:
@@ -716,9 +732,6 @@ public:
 	========================================================================*/
 	void Chunk_Alloc ()
 	{
-<<<<<<< HEAD
-		TlsSetValue (TlsNum, NULL);
-=======
 		st_Chunk_NODE *pPreTopNode = _pTopNode;
 		DWORD ThreadID = GetCurrentThreadId ();
 
@@ -738,23 +751,15 @@ public:
 			}
 			pPreTopNode = pPreTopNode->pNextNode;
 		}
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 		return;
 	}
-	void Chunk_Free (Chunk<DATA> *pChunk)
-	{
-		InterlockedDecrement (( volatile long * )&m_iBlockCount);
 
-		pChunk->~Chunk ();
-		free (pChunk);
-		return;
-	}
 
 	/*========================================================================
 	// 현재 사용중인 블럭 개수를 얻는다.
 	//
 	// ! 주의
-	//	TLS의 성능상 한계로 인해 사용되지 않음.
+	//	TLC의 성능상 한계로 인해 사용되지 않음.
 	//
 	// Parameters:	없음.
 	// Return:		(int) 사용중인 블럭 개수.
@@ -764,6 +769,7 @@ public:
 	//	return m_iAllocCount;
 		return 0;
 	}
+
 	/*========================================================================
 	// 메모리풀 블럭 전체 개수를 얻는다.
 	//
@@ -772,21 +778,21 @@ public:
 	========================================================================*/
 	int		GetFullCount (void)
 	{
-		return m_iBlockCount * Chunk_in_BlockCnt;
+		return m_iBlockCount;
 	}
 
 	/*========================================================================
 	// 현재 보관중인 블럭 개수를 얻는다.
 	//
 	// ! 주의
-	//	TLS의 성능상 한계로 인해 사용되지 않음.
+	//	TLC의 성능상 한계로 인해 사용되지 않음.
 	//
 	// Parameters:	없음.
 	// Return:		(int) 보관중인 블럭 개수.
 	========================================================================*/
 	int		GetFreeCount (void)
 	{
-	//	return m_iBlockCount - m_iAllocCount;
+	//	return m_iFreeCount;
 		return 0;
 	}
 
@@ -794,6 +800,7 @@ private:
 
 	int m_iBlockCount;
 	int m_iAllocCount;
+	int m_iFreeCount;
 };
 
 

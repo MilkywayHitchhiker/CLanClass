@@ -1,9 +1,6 @@
 #include"stdafx.h"
 #include "LanServer.h"
-<<<<<<< HEAD
-=======
 //#include "ServerConfig.h"
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 #define MAKE_i64(hi, lo)    (  (LONGLONG(DWORD(hi) & 0xffffffff) << 32 ) | LONGLONG(DWORD(lo) & 0xffffffff)  )
 
 /*======================================================================
@@ -145,6 +142,7 @@ bool CLanServer::Stop (void)
 ======================================================================*/
 void CLanServer::SendPacket (UINT64 SessionID, Packet *pack)
 {
+
 	Session *p = FindLockSession (SessionID);
 	if ( p == NULL )
 	{
@@ -310,10 +308,6 @@ void CLanServer::AcceptThread (void)
 		ling.l_onoff = 1;
 		ling.l_linger = 0;
 		setsockopt (p->sock, SOL_SOCKET, SO_LINGER, ( char * )&ling, sizeof (ling));
-<<<<<<< HEAD
-
-=======
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 		PostRecv (p);
 
 		InterlockedIncrement (( volatile long * )&_AcceptTPS);
@@ -371,6 +365,7 @@ void CLanServer::WorkerThread (void)
 
 		GQCS_Return = GetQueuedCompletionStatus (_IOCP, &Transferred, ( PULONG_PTR )&pSession, &pOver, INFINITE);
 
+		PROFILE_BEGIN (L"WorKerThread");
 
 		//IOCP 자체 에러부
 		if ( GQCS_Return == false && pOver == NULL )
@@ -415,6 +410,7 @@ void CLanServer::WorkerThread (void)
 			if ( pOver == &pSession->RecvOver )
 			{
 
+				PROFILE_BEGIN (L"recv");
 				pSession->RecvQ.MoveWritePos (Transferred);
 
 				//패킷 처리.
@@ -454,19 +450,9 @@ void CLanServer::WorkerThread (void)
 						Pack->MoveWritePos (Header);
 					try
 					{
-<<<<<<< HEAD
-						LOG_LOG (L"Network", LOG_DEBUG, L"SessionID 0x%p, Header %d", pSession->SessionID, Header);
-						shutdown (pSession->sock, SD_BOTH);
-						break;
-					}
-
-					//데이터가 전부 오지 않았다.
-					if ( Size < sizeof (Header) + Header )
-=======
 						OnRecv (pSession->SessionID, Pack);
 					}
 					catch ( ErrorAlloc Err )
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 					{
 						WCHAR GetErr[20];
 						switch ( Err.Flag )
@@ -477,16 +463,10 @@ void CLanServer::WorkerThread (void)
 						case Put_Error:
 							swprintf_s (GetErr, L"PutData Error");
 
-<<<<<<< HEAD
-					Packet *Pack = Packet::Alloc ();
-
-					pSession->RecvQ.Get (Pack->GetBufferPtr (), Header);
-=======
 						case PutHeader_Error:
 							swprintf_s (GetErr, L"PutHeader Error");
 
 						}
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 
 						LOG_LOG (L"Update", LOG_ERROR, L"SessionID 0x%p, PacketError HeaderSize = %d, DataSize = %d, GetSize = %d, PutSize = %d, ErrorType = %s", Err.UseHeaderSize, Err.UseDataSize, Err.GetSize, Err.PutSize, GetErr);
@@ -505,11 +485,13 @@ void CLanServer::WorkerThread (void)
 
 				PostRecv (pSession);
 
+				PROFILE_END (L"recv");
 
 			}
 			//Send일 경우
 			else if ( pOver == &pSession->SendOver )
 			{
+				PROFILE_BEGIN (L"send");
 				OnSend (pSession->SessionID, Transferred);
 
 				Packet *Pack;
@@ -522,20 +504,6 @@ void CLanServer::WorkerThread (void)
 					Packet::Free (Pack);
 				}
 				if ( pSession->SendDisconnect == TRUE )
-<<<<<<< HEAD
-				{
-					shutdown (pSession->sock,SD_BOTH);
-				}
-				else
-				{
-					pSession->SendFlag = FALSE;
-					if ( pSession->SendQ.GetUseSize () > 0 )
-					{
-						PostSend (pSession);
-					}
-				}
-								
-=======
 				{
 					shutdown (pSession->sock, SD_BOTH);
 				}
@@ -548,15 +516,17 @@ void CLanServer::WorkerThread (void)
 					}
 				}
 
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 				InterlockedIncrement (( volatile LONG * )&_SendPacketTPS);
 
+				PROFILE_END (L"send");
 			}
 
 			IODecrement (pSession);
 		}
+		PROFILE_END (L"WorKerThread");
 	}
 
+	PROFILE_END (L"WorKerThread");
 }
 
 
@@ -604,11 +574,7 @@ bool CLanServer::InitializeNetwork (WCHAR *IP, int PORT)
 	if ( retval == SOCKET_ERROR )
 	{
 		int SockErr = WSAGetLastError ();
-<<<<<<< HEAD
-		LOG_LOG (L"Network", LOG_WARNING, L"bind Failed %d",SockErr);
-=======
 		LOG_LOG (L"Network", LOG_WARNING, L"bind Failed %d", SockErr);
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 		return false;
 	}
 
@@ -754,14 +720,11 @@ void CLanServer::PostSend (Session *p, bool Disconnect)
 
 	p->SendDisconnect = Disconnect;
 
-<<<<<<< HEAD
-=======
 	if ( p->p_IOChk.UseFlag == false )
 	{
 		return;
 	}
 
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 	if ( InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount) == 1 )
 	{
 		IODecrement (p);
@@ -797,8 +760,8 @@ void CLanServer::PostSend (Session *p, bool Disconnect)
 
 	if ( Cnt == 0 )
 	{
-		p->SendFlag = FALSE;
 		IODecrement (p);
+		p->SendFlag = FALSE;
 		return;
 	}
 
@@ -824,6 +787,7 @@ void CLanServer::PostSend (Session *p, bool Disconnect)
 
 			shutdown (p->sock, SD_BOTH);
 			IODecrement (p);
+			PROFILE_END (L"postsend");
 		}
 	}
 	return;

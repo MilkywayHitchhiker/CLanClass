@@ -12,7 +12,7 @@
 #include "LockFreeStack.h"
 #include "LockFreeQueue.h"
 /*======================================================================
-//NET Server Module
+//LAN Server Module
 //해당 클래스는 TCP모듈 클래스로 필요한 경우 상속받아서 사용할것.
 ======================================================================*/
 class CLanServer
@@ -152,11 +152,7 @@ protected:
 	//인자 : Session *
 	//리턴 : 없음
 	======================================================================*/
-<<<<<<< HEAD
-	void PostSend (Session *p,bool Disconnect = false);
-=======
 	void PostSend (Session *p, bool Disconnect = false);
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 
 	/*======================================================================
@@ -176,11 +172,7 @@ protected:
 	======================================================================*/
 	void IODecrement (Session *p);
 
-<<<<<<< HEAD
-public :
-=======
 public:
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 	/*======================================================================
 	//OnStart
 	//설명 : virtual 함수. NetServer가 Start될때 같이 호출된다.
@@ -347,7 +339,7 @@ public:
 	//인자 : 없음
 	//리턴 : double
 	======================================================================*/
-	INT64 Full_MemPoolCnt (void)
+	int Full_MemPoolCnt (void)
 	{
 		return Packet::PacketPool->GetFullCount ();
 	}
@@ -358,7 +350,7 @@ public:
 	//인자 : 없음
 	//리턴 : double
 	======================================================================*/
-	INT64 Alloc_MemPoolCnt (void)
+	int Alloc_MemPoolCnt (void)
 	{
 		return Packet::PacketPool->GetAllocCount ();
 	}

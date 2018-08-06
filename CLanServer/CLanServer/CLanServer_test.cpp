@@ -19,19 +19,11 @@ public:
 	}
 	virtual void OnStart ()
 	{
-<<<<<<< HEAD
-		return;
-	}
-	virtual void OnStop ()
-	{
-		return;
-=======
 
 	}
 	virtual void OnStop ()
 	{
 
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 	}
 	virtual void OnRecv (UINT64 SessionID, Packet *p)
 	{
@@ -75,19 +67,12 @@ ECHO Network;
 
 int main ()
 {
-<<<<<<< HEAD
-	LOG_DIRECTORY (L"SYS_LOG");
-	LOG_LEVEL (LOG_WARNING,false);
-	wprintf (L"MainThread Start\n");
-	Network.Start (L"127.0.0.1", 6000, 200, 9);
-=======
 	LOG_DIRECTORY (L"LOG_FILE");
 	LOG_LEVEL (LOG_WARNING, false);
 
 //	CServerConfig::Initialize ();
 	wprintf (L"MainThread Start\n");
 	Network.Start (L"127.0.0.1", 6000, 200, 10);
->>>>>>> c535bd7fc73a5367d12c92e9ead468baa9e47f0c
 
 
 	UINT AcceptTotal = 0;
@@ -95,8 +80,8 @@ int main ()
 	UINT RecvTPS = 0;
 	UINT SendTPS = 0;
 	UINT ConnectSessionCnt = 0;
-	UINT64 MemoryPoolCnt = 0;
-	UINT64 MemoryPoolUse = 0;
+	int MemoryPoolCnt = 0;
+	int MemoryPoolUse = 0;
 
 	DWORD StartTime = GetTickCount ();
 	DWORD EndTime;
@@ -111,8 +96,8 @@ int main ()
 			wprintf (L"AcceptTPS = %d \n", AcceptTPS);
 			wprintf (L"Sec RecvTPS = %d \n", RecvTPS);
 			wprintf (L"Sec SendTPS = %d \n", SendTPS);
-			wprintf (L"MemoryPoolFull Cnt = %lld\n", MemoryPoolCnt);
-			wprintf (L"MemoryPoolUse Cnt = %lld \n", MemoryPoolUse);
+			wprintf (L"MemoryPoolFull Cnt = %d\n", MemoryPoolCnt);
+			wprintf (L"MemoryPoolUse Cnt = %d \n", MemoryPoolUse);
 
 			wprintf (L"==========================\n");
 
