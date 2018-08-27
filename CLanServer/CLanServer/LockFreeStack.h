@@ -35,7 +35,7 @@ public:
 		_pTop->pTopNode = NULL;
 		_pTop->iUniqueNum = 0;
 
-		_pMemoryPool = new CMemoryPool<st_NODE>(0);
+		_pMemoryPool = new CMemoryPool_LF<st_NODE>(0);
 	}
 
 	/////////////////////////////////////////////////////////////////////////
@@ -61,8 +61,18 @@ public:
 	// Parameters: 없음.
 	// Return: (int)사용중인 용량.
 	/////////////////////////////////////////////////////////////////////////
-	long			GetUseSize(void){ return _lUseSize; }
+	__int64			GetUseSize(void){ return _lUseSize; }
 
+	/////////////////////////////////////////////////////////////////////////
+	// 총 노드 갯수 얻기
+	//
+	// Parameters: 없음.
+	// Return: (int)락프리 스택의 메모리풀 노드 FullCount.
+	/////////////////////////////////////////////////////////////////////////
+	__int64			GetFullNode (void)
+	{
+		return _pMemoryPool->GetFullCount();
+	}
 	/////////////////////////////////////////////////////////////////////////
 	// 데이터가 비었는가 ?
 	//
@@ -96,9 +106,9 @@ public:
 			pPreTopNode.pTopNode = _pTop->pTopNode;
 
 
-			pNode->pNext = _pTop->pTopNode;
+			pNode->pNext = pPreTopNode.pTopNode;
 		} while (!InterlockedCompareExchange128((volatile LONG64 *)_pTop, iUniqueNum, (LONG64)pNode, (LONG64 *)&pPreTopNode));
-		InterlockedIncrement ((volatile LONG * )&_lUseSize);
+		InterlockedIncrement64 ((volatile LONG64 * )&_lUseSize);
 		return true;
 	}
 
@@ -111,7 +121,6 @@ public:
 	bool			Pop(DATA *pOutData)
 	{
 		st_TOP_NODE pPreTopNode;
-		st_NODE *pNode;
 		__int64 iUniqueNum = InterlockedIncrement64(&_iUniqueNum);
 
 		do
@@ -125,20 +134,19 @@ public:
 				return false;
 			}
 
-			pNode = _pTop->pTopNode;
 		} while (!InterlockedCompareExchange128((volatile LONG64 *)_pTop, iUniqueNum, (LONG64)pPreTopNode.pTopNode->pNext, (LONG64 *)&pPreTopNode));
-		InterlockedDecrement (( LONG * )&_lUseSize);
+		InterlockedDecrement64 ((volatile LONG64 * )&_lUseSize);
 
 		*pOutData = pPreTopNode.pTopNode->Data;
-		_pMemoryPool->Free(pNode);
+		_pMemoryPool->Free(pPreTopNode.pTopNode);
 		return true;
 	}
 
 private:
-	CMemoryPool<st_NODE>	*_pMemoryPool;
+	CMemoryPool_LF<st_NODE>	*_pMemoryPool;
 	st_TOP_NODE				*_pTop;
 
 	__int64					_iUniqueNum;
 
-	long						_lUseSize;
+	INT64						_lUseSize;
 };

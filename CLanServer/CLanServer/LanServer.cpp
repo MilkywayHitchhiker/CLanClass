@@ -365,8 +365,6 @@ void CLanServer::WorkerThread (void)
 
 		GQCS_Return = GetQueuedCompletionStatus (_IOCP, &Transferred, ( PULONG_PTR )&pSession, &pOver, INFINITE);
 
-		PROFILE_BEGIN (L"WorKerThread");
-
 		//IOCP 자체 에러부
 		if ( GQCS_Return == false && pOver == NULL )
 		{
@@ -410,7 +408,6 @@ void CLanServer::WorkerThread (void)
 			if ( pOver == &pSession->RecvOver )
 			{
 
-				PROFILE_BEGIN (L"recv");
 				pSession->RecvQ.MoveWritePos (Transferred);
 
 				//패킷 처리.
@@ -485,13 +482,11 @@ void CLanServer::WorkerThread (void)
 
 				PostRecv (pSession);
 
-				PROFILE_END (L"recv");
 
 			}
 			//Send일 경우
 			else if ( pOver == &pSession->SendOver )
 			{
-				PROFILE_BEGIN (L"send");
 				OnSend (pSession->SessionID, Transferred);
 
 				Packet *Pack;
@@ -518,15 +513,13 @@ void CLanServer::WorkerThread (void)
 
 				InterlockedIncrement (( volatile LONG * )&_SendPacketTPS);
 
-				PROFILE_END (L"send");
 			}
 
 			IODecrement (pSession);
 		}
-		PROFILE_END (L"WorKerThread");
+
 	}
 
-	PROFILE_END (L"WorKerThread");
 }
 
 
@@ -613,7 +606,7 @@ CLanServer::Session *CLanServer::FindLockSession (UINT64 SessionID)
 		IODecrement (&Session_Array[Cnt]);
 		return NULL;
 	}
-	//index로 찾은 해당 세션의 id가 내가 찾던 세션이 아닐 경우
+	//index로 찾은 해당 세션이 Release된 혹은 Release되는중인 세션일 경우.
 	if ( Session_Array[Cnt].p_IOChk.UseFlag == false )
 	{
 		LOG_LOG (L"Network", LOG_DEBUG, L"Delete Session search = 0x%p, Array = 0x%p", SessionID, Session_Array[Cnt].SessionID);
@@ -783,7 +776,7 @@ void CLanServer::PostSend (Session *p, bool Disconnect)
 
 			shutdown (p->sock, SD_BOTH);
 			IODecrement (p);
-			PROFILE_END (L"postsend");
+
 		}
 	}
 	return;
@@ -802,6 +795,7 @@ void CLanServer::SessionRelease (Session * p)
 	ComChk.IOCount = 0;
 	ComChk.UseFlag = true;
 	INT64 ComBuf = MAKE_i64 (ComChk.UseFlag, ComChk.IOCount);
+
 	IOChk ExChk;
 	ExChk.IOCount = 0;
 	ExChk.UseFlag = false;
@@ -821,8 +815,6 @@ void CLanServer::SessionRelease (Session * p)
 
 	while ( 1 )
 	{
-
-
 		if ( p->SendQ.Dequeue (&pack) == false )
 		{
 			break;

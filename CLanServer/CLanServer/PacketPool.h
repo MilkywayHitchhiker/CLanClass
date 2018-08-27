@@ -165,7 +165,7 @@ protected:
 	int iRefCnt;
 
 private :
-	static CMemoryPool<Packet> *PacketPool;
+	static CMemoryPool_TLS<Packet> *PacketPool;
 
 	int	PutHeader (char *chpSrc, int iSrcSize);
 
@@ -194,7 +194,7 @@ public :
 	{
 		if ( PacketPool == NULL )
 		{
-			PacketPool = new CMemoryPool<Packet> (0);
+			PacketPool = new CMemoryPool_TLS<Packet> (0);
 		}
 		return;
 	}

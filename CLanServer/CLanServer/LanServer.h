@@ -35,7 +35,7 @@ protected:
 
 		long SendFlag = FALSE;
 		bool SendDisconnect = FALSE;
-		CQueue_LOCK<Packet *> SendQ;
+		CQueue_LF<Packet *> SendQ;
 		OVERLAPPED SendOver;
 		CStack_LF<Packet *> SendPack;
 
@@ -339,7 +339,7 @@ public:
 	//인자 : 없음
 	//리턴 : double
 	======================================================================*/
-	int Full_MemPoolCnt (void)
+	INT64 Full_MemPoolCnt (void)
 	{
 		return Packet::PacketPool->GetFullCount ();
 	}
@@ -350,7 +350,7 @@ public:
 	//인자 : 없음
 	//리턴 : double
 	======================================================================*/
-	int Alloc_MemPoolCnt (void)
+	INT64 Alloc_MemPoolCnt (void)
 	{
 		return Packet::PacketPool->GetAllocCount ();
 	}

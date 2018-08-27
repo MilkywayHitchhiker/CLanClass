@@ -1,6 +1,6 @@
 /*---------------------------------------------------------------
 
-	MemoryPool.
+	MemoryPool_Ver0.5
 
 	메모리 풀 클래스.
 	특정 데이타를 일정량 할당 후 나눠쓴다.
@@ -22,9 +22,12 @@
 #include <Windows.h>
 #include <new.h>
 
-#define TLS_basicChunkSize 1000
 
 
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//MemoryPool
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <class DATA>
 class CMemoryPool
@@ -79,6 +82,7 @@ public:
 		// 메모리 풀 크기 설정
 		========================================================================*/
 		m_iBlockCount = iBlockNum;
+		m_iAllocCount = 0;
 		if ( iBlockNum < 0 )
 		{
 			CCrashDump::Crash ();
@@ -145,7 +149,9 @@ public:
 			}
 
 			else
+			{
 				return nullptr;
+			}
 		}
 
 		else
@@ -193,9 +199,9 @@ public:
 		_pTop = stpBlock;
 
 		Release ();
-		
+
 		InterlockedDecrement64 (( LONG64 * )&m_iAllocCount);
-		
+
 		return true;
 	}
 
@@ -258,6 +264,12 @@ private:
 
 };
 
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//MemoryPool_LockFree
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 template <class DATA>
 class CMemoryPool_LF
 {
@@ -268,11 +280,7 @@ private:
 	========================================================================*/
 	struct st_BLOCK_NODE
 	{
-		DATA Data;
-		st_BLOCK_NODE ()
-		{
-			stpNextBlock = NULL;
-		}
+		DATA data;
 		st_BLOCK_NODE *stpNextBlock;
 	};
 
@@ -310,6 +318,7 @@ public:
 		// 메모리 풀 크기 설정
 		========================================================================*/
 		m_iBlockCount = iBlockNum;
+		m_iAllocCount = 0;
 		if ( iBlockNum < 0 )
 		{
 			CCrashDump::Crash ();
@@ -363,15 +372,15 @@ public:
 	{
 		st_BLOCK_NODE *stpBlock;
 		st_TOP_NODE pPreTopNode;
-		int iBlockCount = m_iBlockCount;
-		InterlockedIncrement64 (( LONG64 * )&m_iAllocCount);
+		INT64 iBlockCount = m_iBlockCount;
+		INT64 iAllocCount = InterlockedIncrement64 (( volatile LONG64 * )&m_iAllocCount);
 
-		if ( iBlockCount < m_iAllocCount )
+		if ( iBlockCount <= iAllocCount )
 		{
 			if ( m_bStoreFlag )
 			{
 				stpBlock = ( st_BLOCK_NODE * )malloc (sizeof (st_BLOCK_NODE));
-				InterlockedIncrement64 (( LONG64 * )&m_iBlockCount);
+				InterlockedIncrement64 (( volatile LONG64 * )&m_iBlockCount);
 			}
 
 			else
@@ -380,27 +389,30 @@ public:
 
 		else
 		{
-			__int64 iUniqueNum = InterlockedIncrement64 (&_iUniqueNum);
+			INT64 iUniqueNum = InterlockedIncrement64 (( volatile LONG64 * )&_iUniqueNum);
 
 			do
 			{
 				pPreTopNode.iUniqueNum = _pTop->iUniqueNum;
 				pPreTopNode.pTopNode = _pTop->pTopNode;
 
-			} while ( !InterlockedCompareExchange128 (( volatile LONG64 * )_pTop,
-				iUniqueNum,
-				( LONG64 )_pTop->pTopNode->stpNextBlock,
-				( LONG64 * )&pPreTopNode) );
+				if ( pPreTopNode.pTopNode != NULL )
+				{
+					continue;
+				}
+
+			} while ( !InterlockedCompareExchange128 (( volatile LONG64 * )_pTop, iUniqueNum, ( LONG64 )pPreTopNode.pTopNode->stpNextBlock, ( LONG64 * )&pPreTopNode) );
 
 			stpBlock = pPreTopNode.pTopNode;
 		}
 
 		if ( bPlacementNew )
 		{
-			new (( DATA * )&stpBlock->Data) DATA;
+			new ((DATA *)&stpBlock->data) DATA;
 		}
 
-		return &stpBlock->Data;
+
+		return &stpBlock->data;
 	}
 
 	/*========================================================================
@@ -414,18 +426,21 @@ public:
 		st_BLOCK_NODE *stpBlock;
 		st_TOP_NODE pPreTopNode;
 
-		__int64 iUniqueNum = InterlockedIncrement64 (&_iUniqueNum);
+		stpBlock = (( st_BLOCK_NODE * )pData);
+
+		InterlockedDecrement64 (( volatile LONG64 * )&m_iAllocCount);
+
+		INT64 iUniqueNum = InterlockedIncrement64 (( volatile LONG64 * )&_iUniqueNum);
 
 		do
 		{
 			pPreTopNode.iUniqueNum = _pTop->iUniqueNum;
 			pPreTopNode.pTopNode = _pTop->pTopNode;
-
-			stpBlock = (( st_BLOCK_NODE * )pData);
-			stpBlock->stpNextBlock = _pTop->pTopNode;
+	
+			stpBlock->stpNextBlock = pPreTopNode.pTopNode;
 		} while ( !InterlockedCompareExchange128 (( volatile LONG64 * )_pTop, iUniqueNum, ( LONG64 )stpBlock, ( LONG64 * )&pPreTopNode) );
 
-		InterlockedDecrement64 (( LONG64 * )&m_iAllocCount);
+
 		return true;
 	}
 
@@ -434,9 +449,9 @@ public:
 	// 현재 사용중인 블럭 개수를 얻는다.
 	//
 	// Parameters:	없음.
-	// Return:		(int) 사용중인 블럭 개수.
+	// Return:		(INT64) 사용중인 블럭 개수.
 	========================================================================*/
-	int		GetAllocCount (void)
+	INT64		GetAllocCount (void)
 	{
 		return m_iAllocCount;
 	}
@@ -445,9 +460,9 @@ public:
 	// 메모리풀 블럭 전체 개수를 얻는다.
 	//
 	// Parameters:	없음.
-	// Return:		(int) 전체 블럭 개수.
+	// Return:		(INT64) 전체 블럭 개수.
 	========================================================================*/
-	int		GetFullCount (void)
+	INT64		GetFullCount (void)
 	{
 		return m_iBlockCount;
 	}
@@ -456,9 +471,9 @@ public:
 	// 현재 보관중인 블럭 개수를 얻는다.
 	//
 	// Parameters:	없음.
-	// Return:		(int) 보관중인 블럭 개수.
+	// Return:		(INT64) 보관중인 블럭 개수.
 	========================================================================*/
-	int		GetFreeCount (void)
+	INT64		GetFreeCount (void)
 	{
 		return m_iBlockCount - m_iAllocCount;
 	}
@@ -472,7 +487,7 @@ private:
 	/*========================================================================
 	// 탑의 Unique Number
 	========================================================================*/
-	__int64 _iUniqueNum;
+	INT64 _iUniqueNum;
 
 	/*========================================================================
 	// 메모리 동적 플래그, true면 없으면 동적할당 함
@@ -482,15 +497,22 @@ private:
 	/*========================================================================
 	// 현재 사용중인 블럭 개수
 	========================================================================*/
-	int m_iAllocCount;
+	INT64 m_iAllocCount;
 
 	/*========================================================================
 	// 전체 블럭 개수
 	========================================================================*/
-	int m_iBlockCount;
+	INT64 m_iBlockCount;
 
 
 };
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//MemoryPool_TLS
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#define TLS_basicChunkSize 5000
+
 
 template <class DATA>
 class CMemoryPool_TLS
@@ -507,13 +529,13 @@ private:
 		struct st_BLOCK_NODE
 		{
 			DATA BLOCK;
-			INT64 Safe;
-			Chunk *pChunk_Main;
+			INT64 Safe = SafeLane;
+			Chunk<DATA> *pChunk_Main;
 		};
-	private :
+	private:
 
 
-		st_BLOCK_NODE *_pArray;
+		st_BLOCK_NODE _pArray[TLS_basicChunkSize];
 		CMemoryPool_TLS<DATA> *_pMain_Manager;
 
 		int FullCnt;
@@ -525,35 +547,24 @@ private:
 		////////////////////////////////////////////////////
 		Chunk ()
 		{
-
 		}
 		~Chunk ()
 		{
 
 		}
 
-		bool ChunkSetting (int iBlockNum, CMemoryPool_TLS<DATA> *pManager)
+		bool ChunkSetting (CMemoryPool_TLS<DATA> *pManager)
 		{
-			if ( iBlockNum < 0 )
-			{
-				CCrashDump::Crash ();
-			}
-			else if ( iBlockNum == 0 )
-			{
-				iBlockNum = TLS_basicChunkSize;
-			}
-
 			_Top = 0;
 			FreeCnt = 0;
-			FullCnt = iBlockNum;
+
+			//			FullCnt = TLS_basicChunkSize;
 			_pMain_Manager = pManager;
-			_pArray = ( st_BLOCK_NODE * )malloc (sizeof (st_BLOCK_NODE) * iBlockNum);
+			Chunk<DATA> *pthis = this;
 
-
-			for ( int Cnt = 0; Cnt < iBlockNum; Cnt++ )
+			for ( int Cnt = TLS_basicChunkSize - 1; Cnt >= 0; Cnt-- )
 			{
-				_pArray[Cnt].pChunk_Main = this;
-				_pArray[Cnt].Safe = SafeLane;
+				_pArray[Cnt].pChunk_Main = pthis;
 			}
 			return true;
 		}
@@ -566,30 +577,31 @@ private:
 		//////////////////////////////////////////////////////
 		DATA	*Alloc (bool bPlacementNew = true)
 		{
-			int iBlockCount = InterlockedIncrement (( volatile long * )&_Top);
-			st_BLOCK_NODE *stpBlock = &_pArray[iBlockCount - 1];
+			int iBlockCount = ++_Top;
+
+			//	st_BLOCK_NODE *stpBlock = &_pArray[iBlockCount - 1];
+			DATA * pBLOCK = &_pArray[iBlockCount - 1].BLOCK;
+
 
 			if ( bPlacementNew )
 			{
-				new (( DATA * )&stpBlock->BLOCK) DATA;
+				new (pBLOCK) DATA;
 			}
 
-			if ( iBlockCount == FullCnt )
+
+			if ( iBlockCount == TLS_basicChunkSize )
 			{
 				//메모리풀에 존재하는 청크 블록 지우고 새로운 블록으로 셋팅.
 				_pMain_Manager->Chunk_Alloc ();
 			}
 
-			return &stpBlock->BLOCK;
+			return pBLOCK;
 
 		}
 
 		bool Free (DATA *pData)
 		{
-			st_BLOCK_NODE *stpBlock;
-
-
-			stpBlock = (( st_BLOCK_NODE * )pData);
+			st_BLOCK_NODE *stpBlock = ( st_BLOCK_NODE * )pData;
 
 			if ( stpBlock->Safe != SafeLane )
 			{
@@ -598,10 +610,9 @@ private:
 
 			int Cnt = InterlockedIncrement (( volatile long * )&FreeCnt);
 
-			if ( Cnt == FullCnt )
+			if ( Cnt == TLS_basicChunkSize )
 			{
-				free (_pArray);
-				free(this);
+				_pMain_Manager->Chunk_Free (this);
 			}
 
 			return true;
@@ -609,17 +620,10 @@ private:
 		}
 	};
 
-	struct st_Chunk_NODE
-	{
-		Chunk<DATA> *pChunk;
-		DWORD ThreadID;
-		st_Chunk_NODE *pNextNode;
-	};
 
-	st_Chunk_NODE *_pTopNode;
-	int Chunk_in_BlockCnt;
-	DWORD TlsNum;
-	SRWLOCK _CS;
+	INT64 Chunk_in_BlockCnt;
+
+	CMemoryPool_LF<Chunk<DATA>> *ChunkMemPool;
 public:
 	/*========================================================================
 	// 생성자
@@ -630,37 +634,19 @@ public:
 		{
 			iBlockNum = TLS_basicChunkSize;
 		}
-
-
-		_pTopNode = NULL;
+		ChunkMemPool = new CMemoryPool_LF<Chunk<DATA>> (0);
 		Chunk_in_BlockCnt = iBlockNum;
-		TlsNum = TlsAlloc ();
 
-		//TLS가 생성이 불가한 상태이므로 자기자신을 파괴하고 종료.
-		if ( TlsNum == TLS_OUT_OF_INDEXES )
+		m_iBlockCount = 0;
+		m_iAllocCount = 0;
+		TLSNum = TlsAlloc ();
+		if ( TLSNum == 0 )
 		{
 			CCrashDump::Crash ();
-			return;//Dump
 		}
 	}
 	~CMemoryPool_TLS ()
 	{
-		st_Chunk_NODE *pPreTopNode = _pTopNode;
-		st_Chunk_NODE *pdeleteTopNode = _pTopNode;
-		while ( 1 )
-		{
-			pPreTopNode = pPreTopNode->pNextNode;
-
-			free (pdeleteTopNode->pChunk);
-
-			free (pdeleteTopNode);
-
-			pdeleteTopNode = pPreTopNode;
-			if ( pdeleteTopNode == NULL )
-			{
-				break;
-			}
-		}
 		return;
 	}
 
@@ -672,40 +658,22 @@ public:
 	========================================================================*/
 	DATA *Alloc (bool bPlacemenenew = true)
 	{
+
+		Chunk<DATA> *pChunk = (Chunk<DATA> *)TlsGetValue (TLSNum);
+
 		//해당 스레드에서 최초 실행될때. 초기화 작업.
-		st_Chunk_NODE *pChunkNode = ( st_Chunk_NODE  * )TlsGetValue (TlsNum);
-
-
-
-		if ( pChunkNode == NULL )
+		if ( pChunk == NULL )
 		{
-
-
-			pChunkNode = ( st_Chunk_NODE  * )malloc (sizeof (st_Chunk_NODE));
-			pChunkNode->pChunk = (Chunk<DATA> *)malloc (sizeof (Chunk<DATA>));
-
-			pChunkNode->ThreadID = GetCurrentThreadId ();
-			pChunkNode->pChunk->ChunkSetting (Chunk_in_BlockCnt, this);
-
-			TlsSetValue (TlsNum, pChunkNode);
-
-			pChunkNode->pNextNode = _pTopNode;
-			_pTopNode = pChunkNode;
-
-			InterlockedAdd (( volatile long * )&m_iBlockCount, Chunk_in_BlockCnt);
-
+			pChunk = Chunk_Alloc ();
 		}
 
-
-		DATA *pData = pChunkNode->pChunk->Alloc ();
-
-
-		//InterlockedIncrement (( volatile long * )&m_iAllocCount);
+		DATA *pData = pChunk->Alloc ();
+		InterlockedIncrement64 (( volatile LONG64 * )&m_iAllocCount);
 
 		return pData;
 
 	}
-	
+
 	/*========================================================================
 	// 사용중이던 블럭을 해제한다.
 	//
@@ -717,8 +685,7 @@ public:
 		Chunk<DATA>::st_BLOCK_NODE *pNode = (Chunk<DATA>::st_BLOCK_NODE *) pDATA;
 
 		bool chk = pNode->pChunk_Main->Free (pDATA);
-	//		InterlockedDecrement (( volatile long * )&m_iAllocCount);
-	//		InterlockedIncrement (( volatile long * )&m_iFreeCount);
+		InterlockedDecrement64 (( volatile LONG64 * )&m_iAllocCount);
 		return chk;
 	}
 public:
@@ -730,78 +697,84 @@ public:
 	// Parameters:	없음
 	// Return:		없음
 	========================================================================*/
-	void Chunk_Alloc ()
+	Chunk<DATA> *Chunk_Alloc ()
 	{
-		st_Chunk_NODE *pPreTopNode = _pTopNode;
-		DWORD ThreadID = GetCurrentThreadId ();
+		Chunk<DATA> *pChunk = ChunkMemPool->Alloc();
 
-		while ( 1 )
-		{
-			if ( pPreTopNode->ThreadID == ThreadID )
-			{
-				pPreTopNode->pChunk = (Chunk<DATA> *)malloc (sizeof (Chunk<DATA>));
-				pPreTopNode->pChunk->ChunkSetting (Chunk_in_BlockCnt, this);
-				break;
-			}
-			//청크 블록을 교체하는데 해당 스레드가 존재하지 않는 스레드라면 문제가 되므로 크래쉬를 유도시켜 덤프 남길것.
-			else if ( pPreTopNode == NULL )
-			{
-				CCrashDump::Crash ();
-				return;
-			}
-			pPreTopNode = pPreTopNode->pNextNode;
-		}
+		TlsSetValue (TLSNum, ( LPVOID * )pChunk);
+
+		pChunk->ChunkSetting (this);
+
+		InterlockedIncrement64 (( volatile LONG64 * )&m_iBlockCount);
+
+		return pChunk;
+	}
+	void Chunk_Free (Chunk<DATA> *pSun)
+	{
+		InterlockedDecrement64 (( volatile LONG64 * )&m_iBlockCount);
+	
+		ChunkMemPool->Free (pSun);
+
 		return;
 	}
-
 
 	/*========================================================================
 	// 현재 사용중인 블럭 개수를 얻는다.
 	//
 	// ! 주의
-	//	TLC의 성능상 한계로 인해 사용되지 않음.
+	//	TLS의 성능상 한계로 인해 사용되지 않음.
 	//
 	// Parameters:	없음.
 	// Return:		(int) 사용중인 블럭 개수.
 	========================================================================*/
-	int		GetAllocCount (void)
+	INT64		GetAllocCount (void)
 	{
-	//	return m_iAllocCount;
-		return 0;
+			return m_iAllocCount;
+		//return 0;
 	}
-
 	/*========================================================================
 	// 메모리풀 블럭 전체 개수를 얻는다.
 	//
 	// Parameters:	없음.
 	// Return:		(int) 전체 블럭 개수.
 	========================================================================*/
-	int		GetFullCount (void)
+	INT64		GetFullCount (void)
 	{
-		return m_iBlockCount;
+		return m_iBlockCount * Chunk_in_BlockCnt;
 	}
 
 	/*========================================================================
 	// 현재 보관중인 블럭 개수를 얻는다.
 	//
 	// ! 주의
-	//	TLC의 성능상 한계로 인해 사용되지 않음.
+	//	TLS의 성능상 한계로 인해 사용되지 않음.
 	//
 	// Parameters:	없음.
 	// Return:		(int) 보관중인 블럭 개수.
 	========================================================================*/
-	int		GetFreeCount (void)
+	INT64		GetFreeCount (void)
 	{
-	//	return m_iFreeCount;
-		return 0;
+			return m_iBlockCount - m_iAllocCount;
+		//return 0;
 	}
 
 private:
 
-	int m_iBlockCount;
-	int m_iAllocCount;
-	int m_iFreeCount;
+
+	DWORD TLSNum;
+	INT64 m_iBlockCount;
+	INT64 m_iAllocCount;
 };
+
+
+
+
+
+
+
+
+
+
 
 
 #endif

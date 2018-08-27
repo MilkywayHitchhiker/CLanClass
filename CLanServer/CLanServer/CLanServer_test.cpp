@@ -80,8 +80,8 @@ int main ()
 	UINT RecvTPS = 0;
 	UINT SendTPS = 0;
 	UINT ConnectSessionCnt = 0;
-	int MemoryPoolCnt = 0;
-	int MemoryPoolUse = 0;
+	INT64 MemoryPoolCnt = 0;
+	INT64 MemoryPoolUse = 0;
 
 	DWORD StartTime = GetTickCount ();
 	DWORD EndTime;
@@ -96,8 +96,8 @@ int main ()
 			wprintf (L"AcceptTPS = %d \n", AcceptTPS);
 			wprintf (L"Sec RecvTPS = %d \n", RecvTPS);
 			wprintf (L"Sec SendTPS = %d \n", SendTPS);
-			wprintf (L"MemoryPoolFull Cnt = %d\n", MemoryPoolCnt);
-			wprintf (L"MemoryPoolUse Cnt = %d \n", MemoryPoolUse);
+			wprintf (L"MemoryPoolFull Cnt = %lld\n", MemoryPoolCnt);
+			wprintf (L"MemoryPoolUse Cnt = %lld \n", MemoryPoolUse);
 
 			wprintf (L"==========================\n");
 
@@ -119,7 +119,7 @@ int main ()
 			break;
 		}
 
-		PROFILE_KEYPROC ();
+
 		/*
 		else if ( GetAsyncKeyState ('S') & 0x8001 )
 		{
