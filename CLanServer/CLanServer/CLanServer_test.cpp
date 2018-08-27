@@ -15,7 +15,6 @@ public:
 	}
 	~ECHO (void)
 	{
-		Stop ();
 	}
 	virtual void OnStart ()
 	{
