@@ -2,8 +2,6 @@
 #include <windows.h>
 #include "PacketPool.h"
 
-//#include"ServerConfig.h"
-
 CMemoryPool_TLS<Packet> *Packet::PacketPool;
 
 
@@ -79,7 +77,7 @@ Packet::~Packet()
 
 
 // 패킷 초기화.
-void Packet::Initial(int iBufferSize)
+void Packet::Initial(int iBufferSize,unsigned char PacketCode,char Xor1,char Xor2)
 {
 	_iBufferSize = iBufferSize;
 	_EnCodeFlag = false;
@@ -103,11 +101,11 @@ void Packet::Initial(int iBufferSize)
 
 	InitializeSRWLock (&_CS);
 
-	/*
-	_PacketCode = _PACKET_CODE;
-	_XORCode1 = _PACKET_KEY1;
-	_XORCode2 = _PACKET_KEY2;
-	*/
+	
+	_PacketCode = PacketCode;
+	_XORCode1 = Xor1;
+	_XORCode2 = Xor2;
+	
 	srand (time (NULL));
 
 
@@ -132,7 +130,6 @@ void Packet::Release (void)
 	{
 		delete[] BufferExpansion;
 	}
-	delete this;
 	return;
 }
 

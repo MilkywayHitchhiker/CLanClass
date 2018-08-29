@@ -427,18 +427,19 @@ void CLanServer::WorkerThread (void)
 						//헤더가 맞지 않는다. shutdown걸고 빠짐.
 						if ( Header != 8 )
 						{
-							LOG_LOG (L"Network", LOG_DEBUG, L"SessionID 0x%p, Header %d", pSession->SessionID, Header);
+							LOG_LOG (L"Network", LOG_ERROR, L"SessionID 0x%p, Header %d", pSession->SessionID, Header);
 							shutdown (pSession->sock, SD_BOTH);
 							break;
 						}
 
 						//데이터가 전부 오지 않았다.
-						if ( Size < sizeof (Header) + Header )
+						if ( Size < 2 + Header )
 						{
+							LOG_LOG (L"Network", LOG_ERROR, L"SessionID 0x%p, Size = %d, FullSize = %d ", pSession->SessionID, Size, 2 + Header);
 							break;
 						}
 
-						pSession->RecvQ.RemoveData (sizeof (Header));
+						pSession->RecvQ.RemoveData (2);
 
 						Packet *Pack = Packet::Alloc ();
 

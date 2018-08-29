@@ -46,7 +46,7 @@ public:
 	virtual	~Packet();
 
 	// 패킷 초기화.
-	void	Initial(int iBufferSize = BUFFER_DEFAULT);
+	void	Initial (int iBufferSize = BUFFER_DEFAULT, unsigned char PacketCode = 0, char Xor1 = 0, char Xor2 = 0);
 
 	//RefCnt를 1 증가시킴. 
 	void	Add (void);
