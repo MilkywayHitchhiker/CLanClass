@@ -26,7 +26,7 @@ private :
 	_TOP_NODE *_pTail;
 
 	volatile __int64 _NodeCnt;
-	volatile __int64 _MaxCnt;
+	__int64 _UniqueNUM;
 public :
 	CMemoryPool_LF<NODE> *_pMemPool;
 	/*//////////////////////////////////////////////////////////////////////
@@ -44,9 +44,7 @@ public :
 		
 		TNode->pNode = HNode->pNode;
 		TNode->UNIQUEUE = 0;
-		_MaxCnt = MaxCnt;
 		_NodeCnt = 0;
-
 		
 		_pHead = HNode;
 		_pTail = TNode;
@@ -77,40 +75,37 @@ public :
 	bool Enqueue (DATA Data)
 	{
 		INT64 NodeCnt = InterlockedIncrement64 (&_NodeCnt);
-
 		//Queue가 꽉찼으므로 return false.
-		if ( NodeCnt > _MaxCnt )
+		if ( NodeCnt >= MaxCnt )
 		{
 			return false;
 		}
 
 		_TOP_NODE PreNode;
-
+		NODE *pNext;
 
 		NODE *pNode = _pMemPool->Alloc ();
 		pNode->Data = Data;
 
 		while ( 1 )
 		{
-
 			PreNode.UNIQUEUE = _pTail->UNIQUEUE;
 			PreNode.pNode = _pTail->pNode;
 
+			pNext = PreNode.pNode->pNext;
 			//Tail의 next가 NULL이 아닐 경우 이미 누군가가 먼저 노드를 넣었으므로 Tail을 밀어줌.
-
-			if ( PreNode.pNode->pNext != NULL )
+			if ( pNext != NULL )
 			{
-				InterlockedCompareExchange128 (( volatile LONG64 * )_pTail, PreNode.UNIQUEUE + 1, ( LONG64 )PreNode.pNode->pNext, ( LONG64 * )&PreNode);
+				InterlockedCompareExchange128 (( volatile LONG64 * )_pTail, ( LONG64 )PreNode.UNIQUEUE + 1, ( LONG64 )pNext, ( LONG64 * )&PreNode);
 				continue;
 			}
 
+
 			//Tail의 Next가 NULL일 경우 현재 노드 연결
-
 			pNode->pNext = NULL;
-			if ( InterlockedCompareExchangePointer (( volatile PVOID * )&_pTail->pNode->pNext, pNode, NULL) == NULL )
+			if ( InterlockedCompareExchangePointer (( volatile PVOID * )&_pTail->pNode->pNext,( PVOID ) pNode, NULL) == NULL )
 			{
-				InterlockedCompareExchange128 (( volatile LONG64 * )_pTail, PreNode.UNIQUEUE + 1, ( LONG64 )pNode, ( LONG64 * )&PreNode);
-
+				InterlockedCompareExchange128 (( volatile LONG64 * )_pTail, ( LONG64 )PreNode.UNIQUEUE + 1, ( LONG64 )pNode, ( LONG64 * )&PreNode);
 				return true;
 			}
 		}
@@ -130,24 +125,26 @@ public :
 		NODE *pNext;
 
 
+		INT64 Unique = InterlockedIncrement64 (( volatile LONG64 * )&_UniqueNUM);
 
 		while ( 1 )
 		{
-
 			TailNode.UNIQUEUE = _pTail->UNIQUEUE;
 			TailNode.pNode = _pTail->pNode;
-			//Tail의 next가 NULL이 아닐 경우 이미 누군가가 먼저 노드를 넣었으므로 Tail을 밀어줌.
 
+
+			//Tail의 next가 NULL이 아닐 경우 이미 누군가가 먼저 노드를 넣었으므로 Tail을 밀어줌.
 			if ( TailNode.pNode->pNext != NULL )
 			{
-				InterlockedCompareExchange128 (( volatile LONG64 * )_pTail, TailNode.UNIQUEUE + 1, ( LONG64 )TailNode.pNode->pNext, ( LONG64 * )&TailNode);
+				InterlockedCompareExchange128 (( volatile LONG64 * )_pTail, ( LONG64 )TailNode.UNIQUEUE + 1, ( LONG64 )TailNode.pNode->pNext, ( LONG64 * )&TailNode);
 				continue;
 			}
-
+			
 
 			PreNode.UNIQUEUE = _pHead->UNIQUEUE;
 			PreNode.pNode = _pHead->pNode;
 
+			
 			pNext = PreNode.pNode->pNext;
 			//헤드의 Next노드를 뽑는 것이므로 pNode가 NULL이라면 Dequeue 불가능.
 			if ( pNext == NULL )
@@ -157,7 +154,7 @@ public :
 			}
 			
 			*pOut = pNext->Data;
-			if ( InterlockedCompareExchange128 (( volatile LONG64 * )_pHead, PreNode.UNIQUEUE + 1, ( LONG64 )pNext, ( LONG64 * )&PreNode) )
+			if ( InterlockedCompareExchange128 (( volatile LONG64 * )_pHead,( LONG64 ) Unique, ( LONG64 )pNext, ( LONG64 * )&PreNode) )
 			{
 				_pMemPool->Free (PreNode.pNode);
 				InterlockedDecrement64 (&_NodeCnt);

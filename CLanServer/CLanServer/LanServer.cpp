@@ -151,7 +151,7 @@ void CLanServer::SendPacket (UINT64 SessionID, Packet *pack)
 
 	short Header = sizeof (INT64);
 
-	pack->PutHeader (( char * )&Header, sizeof (Header));
+	pack->PutHeader (&Header);
 
 	//Send버퍼 초과로 해당 세션을 강제로 끊어줘야 된다.
 	pack->Add ();
@@ -414,10 +414,11 @@ void CLanServer::WorkerThread (void)
 				while ( 1 )
 				{
 						short Header;
+						int HeaderSize = sizeof (Header);
 
 						int Size = pSession->RecvQ.GetUseSize ();
 
-						if ( Size < sizeof (Header) )
+						if ( Size < HeaderSize )
 						{
 							break;
 						}
@@ -433,13 +434,13 @@ void CLanServer::WorkerThread (void)
 						}
 
 						//데이터가 전부 오지 않았다.
-						if ( Size < 2 + Header )
+						if ( Size < HeaderSize + Header )
 						{
-							LOG_LOG (L"Network", LOG_ERROR, L"SessionID 0x%p, Size = %d, FullSize = %d ", pSession->SessionID, Size, 2 + Header);
+							LOG_LOG (L"Network", LOG_ERROR, L"SessionID 0x%p, Size = %d, FullSize = %d ", pSession->SessionID, Size, HeaderSize + Header);
 							break;
 						}
 
-						pSession->RecvQ.RemoveData (2);
+						pSession->RecvQ.RemoveData (HeaderSize);
 
 						Packet *Pack = Packet::Alloc ();
 
@@ -705,21 +706,23 @@ void CLanServer::PostRecv (Session * p)
 //인자 : Session *
 //리턴 : 없음
 ======================================================================*/
-void CLanServer::PostSend (Session *p, bool Disconnect)
+void CLanServer::PostSend (Session *p)
 {
 
 	DWORD SendByte;
 	DWORD dwFlag = 0;
 	int retval;
 
-	p->SendDisconnect = Disconnect;
-
 	if ( p->p_IOChk.UseFlag == false )
 	{
 		return;
 	}
 
-	InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount);
+	if ( InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount) == 1 )
+	{
+		IODecrement (p);
+		return;
+	}
 
 	if ( InterlockedCompareExchange (( volatile long * )&p->SendFlag, TRUE, FALSE) == TRUE )
 	{

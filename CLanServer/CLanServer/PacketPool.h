@@ -168,6 +168,7 @@ private :
 	static CMemoryPool_TLS<Packet> *PacketPool;
 
 	int	PutHeader (char *chpSrc, int iSrcSize);
+	int PutHeader (short *chpSrc);
 
 	unsigned char _PacketCode;
 	char _XORCode1;

@@ -347,7 +347,9 @@ int Packet::GetData(char *chpDest, int iSize)
 		throw err;
 	}
 
+	PROFILE_BEGIN (L"GET_Data_memcpy");
 	memcpy(chpDest, ReadPos, iSize);
+	PROFILE_END (L"GET_Data_memcpy");
 	ReadPos += iSize;
 
 	_iDataSize -= iSize;
@@ -372,8 +374,9 @@ int Packet::PutData(char *chpSrc, int iSrcSize)
 			err.Flag = Put_Error;
 			throw err;
 	}
-
+	PROFILE_BEGIN (L"PUT_Data_memcpy");
 	memcpy(WritePos, chpSrc, iSrcSize);
+	PROFILE_END (L"PUT_Data_memcpy");
 	WritePos += iSrcSize;
 
 	_iDataSize += iSrcSize;
@@ -395,15 +398,34 @@ int	Packet::PutHeader (char *chpSrc, int iSrcSize)
 		throw err;
 	}
 		
-	char *PrePos = HeaderStartPos - iSrcSize;
-	memcpy (PrePos, chpSrc, iSrcSize);
-	HeaderStartPos = PrePos;
+	HeaderStartPos = HeaderStartPos - iSrcSize;
+	memcpy (HeaderStartPos, chpSrc, iSrcSize);
 
 	_iDataSize += iSrcSize;
 	HeaderSize += iSrcSize;
 	return  HeaderSize;
 }
 
+//Short형 Header삽입
+int Packet::PutHeader (short *chpSrc)
+{
+	if ( 2 > HEADERSIZE_DEFAULT - HeaderSize )
+	{
+		ErrorAlloc err;
+		err.GetSize = 0;
+		err.PutSize = 0;
+		err.UseDataSize = _iDataSize;
+		err.UseHeaderSize = HeaderSize;
+		err.Flag = PutHeader_Error;
+		throw err;
+	}
+	short *PrePos = ( short * )HeaderStartPos - 1;
+	*PrePos = *chpSrc;
+	HeaderStartPos = ( char * )PrePos;
+	_iDataSize += 2;
+	HeaderSize += 2;
+	return 2;
+}
 
 
 //===============================================================================================
@@ -432,7 +454,7 @@ bool Packet::EnCode (void)
 
 	HEADER Header;
 
-	//Header.Code = _PACKET_CODE;
+	Header.Code = _PacketCode;
 	Header.Len = DataSize;
 
 	//1. Rand XOR Code 는 보내는 이가 랜덤하게 1byte 코드를 생성
@@ -474,7 +496,7 @@ bool Packet::EnCode (void)
 	}
 
 	//지역변수 Buff의 Data를 HeaderPos로 옮김.
-	PutHeader ((char *)&Header.CheckSum, 1);
+	PutHeader (( char * )&Header.CheckSum, 1);
 	PutHeader (( char * )&Header.RandXOR, 1);
 	PutHeader (( char * )&Header.Len, 2);
 	PutHeader (( char * )&Header.Code, 1);
