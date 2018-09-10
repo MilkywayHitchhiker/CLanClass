@@ -37,6 +37,7 @@ public :
 		_TOP_NODE *HNode = ( _TOP_NODE * )_aligned_malloc (sizeof (_TOP_NODE), 16);
 		_TOP_NODE *TNode = ( _TOP_NODE * )_aligned_malloc (sizeof (_TOP_NODE), 16);
 		_pMemPool = new CMemoryPool_LF<NODE> (0);
+	
 
 		HNode->pNode = _pMemPool->Alloc ();
 		HNode->pNode->pNext = NULL;
@@ -123,8 +124,7 @@ public :
 		_TOP_NODE TailNode;
 
 		NODE *pNext;
-
-
+		
 		INT64 Unique = InterlockedIncrement64 (( volatile LONG64 * )&_UniqueNUM);
 
 		while ( 1 )
@@ -137,7 +137,6 @@ public :
 			if ( TailNode.pNode->pNext != NULL )
 			{
 				InterlockedCompareExchange128 (( volatile LONG64 * )_pTail, ( LONG64 )TailNode.UNIQUEUE + 1, ( LONG64 )TailNode.pNode->pNext, ( LONG64 * )&TailNode);
-				continue;
 			}
 			
 

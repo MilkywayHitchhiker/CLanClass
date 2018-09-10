@@ -17,7 +17,7 @@
 ======================================================================*/
 class CLanServer
 {
-#define SendbufMax 100
+#define SendbufMax 200
 protected:
 	struct IOChk
 	{

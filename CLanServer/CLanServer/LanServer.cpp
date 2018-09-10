@@ -263,6 +263,7 @@ void CLanServer::AcceptThread (void)
 
 		if ( hClientSock == INVALID_SOCKET )
 		{
+			LOG_LOG (L"Network", LOG_SYSTEM, L"INVALID_SOCKET ERROR",);
 			break;
 		}
 
@@ -308,6 +309,7 @@ void CLanServer::AcceptThread (void)
 		ling.l_onoff = 1;
 		ling.l_linger = 0;
 		setsockopt (p->sock, SOL_SOCKET, SO_LINGER, ( char * )&ling, sizeof (ling));
+
 		PostRecv (p);
 
 		InterlockedIncrement (( volatile long * )&_AcceptTPS);
@@ -423,7 +425,7 @@ void CLanServer::WorkerThread (void)
 							break;
 						}
 
-						pSession->RecvQ.Peek (( char * )&Header, sizeof (Header));
+						pSession->RecvQ.Peek (( char * )&Header, HeaderSize);
 
 						//헤더가 맞지 않는다. shutdown걸고 빠짐.
 						if ( Header != 8 )
@@ -709,9 +711,7 @@ void CLanServer::PostRecv (Session * p)
 void CLanServer::PostSend (Session *p)
 {
 
-	DWORD SendByte;
-	DWORD dwFlag = 0;
-	int retval;
+
 
 	if ( p->p_IOChk.UseFlag == false )
 	{
@@ -732,14 +732,15 @@ void CLanServer::PostSend (Session *p)
 
 	//WSASend 셋팅 및 등록부
 
-	int Cnt = 0;
+	DWORD Cnt = 0;
 	WSABUF buf[SendbufMax];
 
 	Packet *pack;
+
 	while ( 1 )
 	{
 
-		if ( p->SendQ.Dequeue (&pack) == false || Cnt >= SendbufMax )
+		if ( p->SendQ.Dequeue (&pack) == false || Cnt >= (SendbufMax -1) )
 		{
 			break;
 		}
@@ -759,7 +760,12 @@ void CLanServer::PostSend (Session *p)
 	}
 
 	memset (&p->SendOver, 0, sizeof (p->SendOver));
+	DWORD dwFlag = 0;
+	DWORD SendByte;
+	int retval;
+
 	retval = WSASend (p->sock, buf, Cnt, &SendByte, dwFlag, &p->SendOver, NULL);
+
 	//에러체크
 	if ( retval == SOCKET_ERROR )
 	{

@@ -67,7 +67,7 @@ ECHO Network;
 int main ()
 {
 	LOG_DIRECTORY (L"LOG_FILE");
-	LOG_LEVEL (LOG_WARNING, false);
+	LOG_LEVEL (LOG_ERROR, false);
 
 //	CServerConfig::Initialize ();
 	wprintf (L"MainThread Start\n");
