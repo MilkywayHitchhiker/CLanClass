@@ -638,10 +638,10 @@ CLanServer::Session *CLanServer::FindLockSession (UINT64 SessionID)
 ======================================================================*/
 void CLanServer::PostRecv (Session * p)
 {
-	int Cnt = 0;
-	DWORD RecvByte;
-	DWORD dwFlag = 0;
-	int retval;
+	if ( p->p_IOChk.UseFlag == false )
+	{
+		return;
+	}
 
 	InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount);
 
@@ -656,7 +656,13 @@ void CLanServer::PostRecv (Session * p)
 		return;
 	}
 
+
 	//WSARecv µî·Ï
+	DWORD Cnt = 0;
+	DWORD RecvByte;
+	DWORD dwFlag = 0;
+	int retval;
+
 
 	WSABUF buf[2];
 	buf[0].buf = p->RecvQ.GetWriteBufferPtr ();
@@ -665,7 +671,7 @@ void CLanServer::PostRecv (Session * p)
 	if ( p->RecvQ.GetFreeSize () > p->RecvQ.GetNotBrokenPutSize () )
 	{
 		buf[1].buf = p->RecvQ.GetBufferPtr ();
-		buf[1].len = p->RecvQ.GetFreeSize () - p->RecvQ.GetNotBrokenPutSize ();
+		buf[1].len = p->RecvQ.GetFreeSize () - p->RecvQ.GetNotBrokenPutSize () + 1;
 		Cnt++;
 	}
 
@@ -689,7 +695,7 @@ void CLanServer::PostRecv (Session * p)
 			}
 			else
 			{
-				LOG_LOG (L"Network", LOG_DEBUG, L"SessionID = 0x%p, ErrorCode = %ld PostRecv", p->SessionID, Errcode);
+				LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld PostRecv", p->SessionID, Errcode);
 			}
 
 			shutdown (p->sock, SD_BOTH);
@@ -710,9 +716,6 @@ void CLanServer::PostRecv (Session * p)
 ======================================================================*/
 void CLanServer::PostSend (Session *p)
 {
-
-
-
 	if ( p->p_IOChk.UseFlag == false )
 	{
 		return;
@@ -740,7 +743,7 @@ void CLanServer::PostSend (Session *p)
 	while ( 1 )
 	{
 
-		if ( p->SendQ.Dequeue (&pack) == false || Cnt >= (SendbufMax -1) )
+		if ( p->SendQ.Dequeue (&pack) == false || Cnt >= SendbufMax )
 		{
 			break;
 		}
@@ -781,7 +784,7 @@ void CLanServer::PostSend (Session *p)
 			}
 			else
 			{
-				LOG_LOG (L"Network", LOG_DEBUG, L"SessionID = 0x%p, ErrorCode = %ld PostSend", p->SessionID, Errcode);
+				LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld PostSend", p->SessionID, Errcode);
 			}
 
 			shutdown (p->sock, SD_BOTH);
