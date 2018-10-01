@@ -2,7 +2,7 @@
 #include <windows.h>
 #include "PacketPool.h"
 
-CMemoryPool_TLS<Packet> *Packet::PacketPool;
+CMemoryPool_LF<Packet> *Packet::PacketPool;
 
 
 Packet::Packet() : Buffer (NULL),DataFieldStart (NULL),DataFieldEnd (NULL),ReadPos (NULL),WritePos (NULL)
