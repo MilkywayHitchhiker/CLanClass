@@ -515,11 +515,13 @@ void CLanServer::WorkerThread (void)
 					pSession->SendFlag = FALSE;
 					shutdown (pSession->sock, SD_BOTH);
 				}
-
-				pSession->SendFlag = FALSE;
-				if ( pSession->SendQ.GetUseSize () > 0 )
+				else
 				{
-					PostSend (pSession);
+					pSession->SendFlag = FALSE;
+					if ( pSession->SendQ.GetUseSize () > 0 )
+					{
+						PostSend (pSession);
+					}
 				}
 
 
@@ -750,11 +752,8 @@ void CLanServer::PostSend (Session *p)
 	while ( 1 )
 	{
 
-<<<<<<< HEAD
+
 		if ( p->SendQ.Dequeue (&pack) == false )
-=======
-		if ( p->SendQ.Dequeue (&pack) == false || Cnt >= SendbufMax )
->>>>>>> 46558a40b0f7f6f7a4ef0fa250b72e9bdea436eb
 		{
 			break;
 		}

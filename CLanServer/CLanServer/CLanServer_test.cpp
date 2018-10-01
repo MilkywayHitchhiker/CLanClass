@@ -67,12 +67,7 @@ ECHO Network;
 int main ()
 {
 	LOG_DIRECTORY (L"LOG_FILE");
-<<<<<<< HEAD
-	LOG_LEVEL (LOG_DEBUG, false);
-=======
 	LOG_LEVEL (LOG_WARNING, false);
->>>>>>> 46558a40b0f7f6f7a4ef0fa250b72e9bdea436eb
-
 //	CServerConfig::Initialize ();
 	wprintf (L"MainThread Start\n");
 	Network.Start (L"127.0.0.1", 6000, 200, 10);

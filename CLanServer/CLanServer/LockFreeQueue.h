@@ -108,11 +108,8 @@ public :
 				continue;
 			}
 
-<<<<<<< HEAD
-
-=======
 			//Tail의 Next가 NULL일 경우 현재 노드 연결
->>>>>>> 46558a40b0f7f6f7a4ef0fa250b72e9bdea436eb
+
 			pNode->pNext = NULL;
 			if ( InterlockedCompareExchangePointer (( volatile PVOID * )&_pTail->pNode->pNext,( PVOID ) pNode, NULL) == NULL )
 			{
