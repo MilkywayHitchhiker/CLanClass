@@ -263,7 +263,7 @@ void CLanServer::AcceptThread (void)
 
 		if ( hClientSock == INVALID_SOCKET )
 		{
-			LOG_LOG (L"Network", LOG_SYSTEM, L"INVALID_SOCKET ERROR",);
+			LOG_LOG (L"Network", LOG_SYSTEM, L"INVALID_SOCKET_ERROR_ACCEPT",);
 			break;
 		}
 
@@ -288,12 +288,15 @@ void CLanServer::AcceptThread (void)
 		p->SendFlag = false;
 		p->SendDisconnect = false;
 
+		linger ling;
+		ling.l_onoff = 1;
+		ling.l_linger = 0;
+		setsockopt (p->sock, SOL_SOCKET, SO_LINGER, ( char * )&ling, sizeof (ling));
+
 		InterlockedIncrement (( volatile long * )&_Use_Session_Cnt);
 
 		//IOCP 포트에 등록
 		CreateIoCompletionPort (( HANDLE )p->sock, _IOCP, ( ULONG_PTR )p, 0);
-
-
 
 		//OnClientJoin으로 새로운 접속자 알림.
 		WCHAR IP[36];
@@ -301,14 +304,11 @@ void CLanServer::AcceptThread (void)
 
 		if ( OnClientJoin (p->SessionID, IP, ntohs (ClientAddr.sin_port)) == false )
 		{
-			SessionRelease (p);
+			IODecrement (p);
 			continue;
 		}
 
-		linger ling;
-		ling.l_onoff = 1;
-		ling.l_linger = 0;
-		setsockopt (p->sock, SOL_SOCKET, SO_LINGER, ( char * )&ling, sizeof (ling));
+
 
 		PostRecv (p);
 
@@ -418,7 +418,7 @@ void CLanServer::WorkerThread (void)
 						short Header;
 						int HeaderSize = sizeof (Header);
 
-						int Size = pSession->RecvQ.GetUseSize ();
+						int Size = pSession->RecvQ.GetUseSize();
 
 						if ( Size < HeaderSize )
 						{
@@ -449,6 +449,14 @@ void CLanServer::WorkerThread (void)
 						pSession->RecvQ.Get (Pack->GetBufferPtr (), Header);
 
 						Pack->MoveWritePos (Header);
+
+						if ( Pack->GetDataSize() != Header )
+						{
+							LOG_LOG (L"Network", LOG_ERROR, L"SessionID 0x%p, Size = %d, PacketSize Miss = %d ", pSession->SessionID, Size, Pack->GetDataSize ());
+							CCrashDump::Crash ();
+						}
+
+
 					try
 					{
 						OnRecv (pSession->SessionID, Pack);
@@ -504,16 +512,16 @@ void CLanServer::WorkerThread (void)
 				}
 				if ( pSession->SendDisconnect == TRUE )
 				{
+					pSession->SendFlag = FALSE;
 					shutdown (pSession->sock, SD_BOTH);
 				}
-				else
+
+				pSession->SendFlag = FALSE;
+				if ( pSession->SendQ.GetUseSize () > 0 )
 				{
-					pSession->SendFlag = FALSE;
-					if ( pSession->SendQ.GetUseSize () > 0 )
-					{
-						PostSend (pSession);
-					}
+					PostSend (pSession);
 				}
+
 
 				InterlockedIncrement (( volatile LONG * )&_SendPacketTPS);
 
@@ -658,16 +666,19 @@ void CLanServer::PostRecv (Session * p)
 
 	//WSARecv 등록
 
+
 	WSABUF buf[2];
 	buf[0].buf = p->RecvQ.GetWriteBufferPtr ();
 	buf[0].len = p->RecvQ.GetNotBrokenPutSize ();
 	Cnt++;
+	
 	if ( p->RecvQ.GetFreeSize () > p->RecvQ.GetNotBrokenPutSize () )
 	{
 		buf[1].buf = p->RecvQ.GetBufferPtr ();
 		buf[1].len = p->RecvQ.GetFreeSize () - p->RecvQ.GetNotBrokenPutSize ();
 		Cnt++;
 	}
+	
 
 	memset (&p->RecvOver, 0, sizeof (p->RecvOver));
 
@@ -710,19 +721,12 @@ void CLanServer::PostRecv (Session * p)
 ======================================================================*/
 void CLanServer::PostSend (Session *p)
 {
-
-
-
 	if ( p->p_IOChk.UseFlag == false )
 	{
 		return;
 	}
 
-	if ( InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount) == 1 )
-	{
-		IODecrement (p);
-		return;
-	}
+	InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount);
 
 	if ( InterlockedCompareExchange (( volatile long * )&p->SendFlag, TRUE, FALSE) == TRUE )
 	{
@@ -735,27 +739,33 @@ void CLanServer::PostSend (Session *p)
 	DWORD Cnt = 0;
 	WSABUF buf[SendbufMax];
 
-	Packet *pack;
+	Packet *pack = NULL;
 
 	while ( 1 )
 	{
 
-		if ( p->SendQ.Dequeue (&pack) == false || Cnt >= (SendbufMax -1) )
+		if ( p->SendQ.Dequeue (&pack) == false )
 		{
 			break;
 		}
 
-		buf[Cnt].buf = pack->GetBufferPtr ();
-		buf[Cnt].len = pack->GetDataSize ();
-		Cnt++;
 
+		if ( Cnt >= SendbufMax )
+		{
+			break;
+		}
+
+		buf[Cnt].len = pack->GetDataSize ();
+		buf[Cnt].buf = pack->GetBufferPtr ();
 		p->SendPack.Push (pack);
+
+		Cnt++;
 	}
 
 	if ( Cnt == 0 )
 	{
-		IODecrement (p);
 		p->SendFlag = FALSE;
+		IODecrement (p);
 		return;
 	}
 

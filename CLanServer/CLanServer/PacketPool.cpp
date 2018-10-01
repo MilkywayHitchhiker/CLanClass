@@ -150,14 +150,18 @@ void Packet::Clear(void)
 // Wirtepos 이동. (음수이동은 안됨)
 int Packet::MoveWritePos(int iSize)
 {
-	if ( 0 > iSize ) return 0;
+	if ( 0 > iSize )
+	{
+		return 0;
+	}
 
 	/*-----------------------------------------------------------------
 	 이동할 자리가 부족하다면.
 	-------------------------------------------------------------------*/
 	if ( WritePos + iSize > DataFieldEnd )
+	{
 		return 0;
-
+	}
 	WritePos += iSize;
 	_iDataSize += iSize;
 

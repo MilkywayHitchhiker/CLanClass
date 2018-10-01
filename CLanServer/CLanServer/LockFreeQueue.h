@@ -75,6 +75,7 @@ public :
 
 	bool Enqueue (DATA Data)
 	{
+		int roop = 0;
 		INT64 NodeCnt = InterlockedIncrement64 (&_NodeCnt);
 		//Queue가 꽉찼으므로 return false.
 		if ( NodeCnt >= MaxCnt )
@@ -98,17 +99,23 @@ public :
 			if ( pNext != NULL )
 			{
 				InterlockedCompareExchange128 (( volatile LONG64 * )_pTail, ( LONG64 )PreNode.UNIQUEUE + 1, ( LONG64 )pNext, ( LONG64 * )&PreNode);
+				roop++;
+				if ( roop > 5 )
+				{
+					CCrashDump::Crash ();
+				}
 				continue;
 			}
 
 
-			//Tail의 Next가 NULL일 경우 현재 노드 연결
 			pNode->pNext = NULL;
 			if ( InterlockedCompareExchangePointer (( volatile PVOID * )&_pTail->pNode->pNext,( PVOID ) pNode, NULL) == NULL )
 			{
 				InterlockedCompareExchange128 (( volatile LONG64 * )_pTail, ( LONG64 )PreNode.UNIQUEUE + 1, ( LONG64 )pNode, ( LONG64 * )&PreNode);
 				return true;
 			}
+
+
 		}
 	}
 
@@ -132,9 +139,9 @@ public :
 			TailNode.UNIQUEUE = _pTail->UNIQUEUE;
 			TailNode.pNode = _pTail->pNode;
 
-
+			pNext = TailNode.pNode->pNext;
 			//Tail의 next가 NULL이 아닐 경우 이미 누군가가 먼저 노드를 넣었으므로 Tail을 밀어줌.
-			if ( TailNode.pNode->pNext != NULL )
+			if ( pNext != NULL )
 			{
 				InterlockedCompareExchange128 (( volatile LONG64 * )_pTail, ( LONG64 )TailNode.UNIQUEUE + 1, ( LONG64 )TailNode.pNode->pNext, ( LONG64 * )&TailNode);
 			}
