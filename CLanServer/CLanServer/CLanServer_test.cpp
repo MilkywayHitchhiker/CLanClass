@@ -49,7 +49,7 @@ public:
 		Packet *Pack = Packet::Alloc ();
 		*Pack << Data;
 
-		SendPacket (SessionID, Pack);
+		SendPacket_Accept (SessionID, Pack);
 
 
 		Packet::Free (Pack);

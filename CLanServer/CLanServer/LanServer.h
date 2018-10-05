@@ -92,7 +92,13 @@ protected:
 	======================================================================*/
 	void WorkerThread (void);
 
-
+	/*======================================================================
+	//SendThread
+	//설명 : 실제 SendThread. Loop를 돌면서 Send 작업을 실행함.
+	//인자 : 없음
+	//리턴 : 없음
+	======================================================================*/
+	void SendThread (void);
 
 	/*======================================================================
 	//InitializeNetwork
@@ -232,6 +238,14 @@ public:
 
 
 	/*======================================================================
+	//SendPacket_Accept
+	//설명 : Packet을 SendQ에 넣고 PostSend함수 호출. 첫 로그인시 바로 Send를 보내줘야 되는 경우
+	//인자 : UINT64 SessionID, Packet *
+	//리턴 : 없음
+	======================================================================*/
+	void SendPacket_Accept (UINT64 SessionID, Packet *pack);
+
+	/*======================================================================
 	//Disconnect
 	//설명 : 해당 세션의 TCP 연결 해제 요청 함수.
 	//인자 : UINT64 SessionID
@@ -362,7 +376,7 @@ protected:
 	//인자 : LPVOID pParam; = CLanServer this pointer 를 일로 넘겨받음.
 	//리턴 : 0
 	======================================================================*/
-	static unsigned int WINAPI AcceptThread (LPVOID pParam);
+	static unsigned int WINAPI Accept_Thread (LPVOID pParam);
 
 
 	/*======================================================================
@@ -371,5 +385,15 @@ protected:
 	//인자 : LPVOID pParam; = CLanServer this pointer 를 일로 넘겨받음.
 	//리턴 : 0
 	======================================================================*/
-	static unsigned int WINAPI WorkerThread (LPVOID pParam);
+	static unsigned int WINAPI Worker_Thread (LPVOID pParam);
+
+
+	/*======================================================================
+	//SendThread
+	//설명 : SendThread() 함수 랩핑.
+	//인자 : LPVOID pParam; = CLanServer this pointer 를 일로 넘겨받음.
+	//리턴 : 0
+	======================================================================*/
+	static unsigned int WINAPI Send_Thread (LPVOID pParam);
+
 };

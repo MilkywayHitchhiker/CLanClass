@@ -56,10 +56,7 @@ bool CLanServer::Start (WCHAR * ServerIP, int PORT, int Session_Max, int WorkerT
 	//비어있는 세션배열 번호 전부 저장.
 	for ( int Cnt = 0; Cnt < Session_Max; Cnt++ )
 	{
-		if ( Session_Array[Cnt].p_IOChk.UseFlag == false )
-		{
-			emptySession.Push (Cnt);
-		}
+		emptySession.Push (Cnt);
 	}
 
 	//IOCP 포트 생성 및 스레드 생성.
@@ -68,11 +65,11 @@ bool CLanServer::Start (WCHAR * ServerIP, int PORT, int Session_Max, int WorkerT
 
 	Thread = new HANDLE[WorkerThread_Num + 1];
 
-	Thread[0] = ( HANDLE )_beginthreadex (NULL, 0, AcceptThread, (void *)this, NULL, NULL);
-
-	for ( int Cnt = 0; Cnt < WorkerThread_Num; Cnt++ )
+	Thread[0] = ( HANDLE )_beginthreadex (NULL, 0, Accept_Thread, (void *)this, NULL, NULL);
+	Thread[1] = ( HANDLE )_beginthreadex (NULL, 0, Send_Thread, (void *)this, NULL, NULL);
+	for ( int Cnt = 2; Cnt < WorkerThread_Num; Cnt++ )
 	{
-		Thread[Cnt + 1] = ( HANDLE )_beginthreadex (NULL, 0, WorkerThread, (void *)this, NULL, NULL);
+		Thread[Cnt] = ( HANDLE )_beginthreadex (NULL, 0, Worker_Thread, (void *)this, NULL, NULL);
 	}
 
 	LOG_LOG (L"Network", LOG_SYSTEM, L" NetworkStart IP = %s, PORT = %d, SessionMax = %d, WorkerThreadNum = %d", ServerIP, PORT, Session_Max, WorkerThread_Num);
@@ -163,9 +160,84 @@ void CLanServer::SendPacket (UINT64 SessionID, Packet *pack)
 		return;
 	}
 
-	PostSend (p);
+	//PostSend (p);
 
 	IODecrement (p);
+	return;
+}
+
+
+
+/*======================================================================
+//SendPacket_Accept
+//설명 : Packet을 SendQ에 넣고 WSASend 호출. 첫 로그인시 바로 Send를 보내줘야 되는 경우 사용하는 함수.
+//인자 : UINT64 SessionID, Packet *
+//리턴 : 없음
+======================================================================*/
+void CLanServer::SendPacket_Accept (UINT64 SessionID, Packet *pack)
+{
+
+	Session *p = FindLockSession (SessionID);
+	if ( p == NULL )
+	{
+		return;
+	}
+
+	short Header = sizeof (INT64);
+
+	pack->PutHeader (&Header);
+
+	//Send버퍼 초과로 해당 세션을 강제로 끊어줘야 된다.
+	pack->Add ();
+
+	//기존 PostSend 부분.
+	////////////////////////////////////////////////////////////////////////
+	if ( InterlockedCompareExchange (( volatile long * )&p->SendFlag, TRUE, FALSE) == TRUE )
+	{
+		IODecrement (p);
+		return;
+	}
+
+	//WSASend 셋팅 및 등록부
+	WSABUF buf;
+	
+	buf.len = pack->GetDataSize ();
+	buf.buf = pack->GetBufferPtr ();
+	p->SendPack.Push (pack);
+
+	memset (&p->SendOver, 0, sizeof (p->SendOver));
+	DWORD dwFlag = 0;
+	DWORD SendByte;
+	int retval;
+
+	retval = WSASend (p->sock, &buf, 1, &SendByte, dwFlag, &p->SendOver, NULL);
+
+	//에러체크
+	if ( retval == SOCKET_ERROR )
+	{
+		DWORD Errcode = GetLastError ();
+
+		//IO_PENDING이라면 문제없이 진행중이므로 그냥 빠져나옴.
+		if ( Errcode != WSA_IO_PENDING )
+		{
+
+			if ( Errcode == WSAENOBUFS )
+			{
+				LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld WSAENOBUFS ERROR ", p->SessionID, Errcode);
+			}
+			else
+			{
+				LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld PostSend", p->SessionID, Errcode);
+			}
+
+			shutdown (p->sock, SD_BOTH);
+			IODecrement (p);
+		}
+	}
+	/////////////////////////////////////////////////////////////////////////////////////////////////
+	//여기까지가 기존 PostSend부분
+
+
 	return;
 }
 
@@ -222,7 +294,7 @@ void CLanServer::IODecrement (Session * p)
 //인자 : LPVOID pParam; = CLanServer this pointer 를 일로 넘겨받음.
 //리턴 : 0
 ======================================================================*/
-unsigned int CLanServer::AcceptThread (LPVOID pParam)
+unsigned int CLanServer::Accept_Thread (LPVOID pParam)
 {
 	CLanServer *p = ( CLanServer * )pParam;
 
@@ -285,8 +357,6 @@ void CLanServer::AcceptThread (void)
 		p->sock = hClientSock;
 		p->SessionID = CreateSessionID (Cnt, InterlockedIncrement64 (( volatile LONG64 * )&_SessionID_Count));
 		p->p_IOChk.UseFlag = true;
-		p->SendFlag = false;
-		p->SendDisconnect = false;
 
 		linger ling;
 		ling.l_onoff = 1;
@@ -329,7 +399,7 @@ void CLanServer::AcceptThread (void)
 //인자 : LPVOID pParam; = CLanServer this pointer 를 일로 넘겨받음.
 //리턴 : 0
 ======================================================================*/
-unsigned int CLanServer::WorkerThread (LPVOID pParam)
+unsigned int CLanServer::Worker_Thread (LPVOID pParam)
 {
 	CLanServer *p = ( CLanServer * )pParam;
 	wprintf (L"worker_thread_Start\n");
@@ -537,7 +607,130 @@ void CLanServer::WorkerThread (void)
 }
 
 
+/*======================================================================
+//SendThread
+//설명 : SendThread() 함수 랩핑.
+//인자 : LPVOID pParam; = CLanServer this pointer 를 일로 넘겨받음.
+//리턴 : 0
+======================================================================*/
+unsigned int CLanServer::Send_Thread (LPVOID pParam)
+{
+	CLanServer *p = ( CLanServer * )pParam;
+	wprintf (L"Send_thread_Start\n");
+	LOG_LOG (L"Network", LOG_SYSTEM, L"Send Thread_Start");
 
+	p->SendThread ();
+
+	wprintf (L"\nSend Thread End\n");
+	LOG_LOG (L"Network", LOG_SYSTEM, L"Send Thread_End");
+	return 0;
+}
+
+
+/*======================================================================
+//SendThread
+//설명 : 실제 SendThread. Loop를 돌면서 Send 작업을 실행함.
+//인자 : 없음
+//리턴 : 없음
+======================================================================*/
+void CLanServer::SendThread (void)
+{
+	Session *p;
+	
+	while ( 1 )
+	{
+		for ( int iCnt = 0; iCnt < _Session_Max; iCnt++ )
+		{
+			p = &Session_Array[iCnt];
+
+
+			if ( p->p_IOChk.UseFlag == false )
+			{
+				continue;
+			}
+
+			if ( InterlockedCompareExchange (( volatile long * )&p->SendFlag, TRUE, FALSE) == TRUE )
+			{
+				continue;
+			}
+
+			if ( InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount) == 1 )
+			{
+				IODecrement (p);
+				continue;
+			}
+
+
+			//WSASend 셋팅 및 등록부
+
+			DWORD Cnt = 0;
+			WSABUF buf[SendbufMax];
+
+			Packet *pack = NULL;
+
+			while ( 1 )
+			{
+
+
+				if ( p->SendQ.Dequeue (&pack) == false )
+				{
+					break;
+				}
+
+
+				if ( Cnt >= SendbufMax )
+				{
+					break;
+				}
+
+				buf[Cnt].len = pack->GetDataSize ();
+				buf[Cnt].buf = pack->GetBufferPtr ();
+				p->SendPack.Push (pack);
+
+				Cnt++;
+			}
+
+			if ( Cnt == 0 )
+			{
+				p->SendFlag = FALSE;
+				IODecrement (p);
+				continue;
+			}
+
+			memset (&p->SendOver, 0, sizeof (p->SendOver));
+			DWORD dwFlag = 0;
+			DWORD SendByte;
+			int retval;
+
+			retval = WSASend (p->sock, buf, Cnt, &SendByte, dwFlag, &p->SendOver, NULL);
+
+			//에러체크
+			if ( retval == SOCKET_ERROR )
+			{
+				DWORD Errcode = GetLastError ();
+
+				//IO_PENDING이라면 문제없이 진행중이므로 그냥 빠져나옴.
+				if ( Errcode != WSA_IO_PENDING )
+				{
+
+					if ( Errcode == WSAENOBUFS )
+					{
+						LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld WSAENOBUFS ERROR ", p->SessionID, Errcode);
+					}
+					else
+					{
+						LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld PostSend", p->SessionID, Errcode);
+					}
+
+					shutdown (p->sock, SD_BOTH);
+					IODecrement (p);
+
+				}
+			}
+		}
+		Sleep (0);
+	}
+}
 
 
 
@@ -729,86 +922,7 @@ void CLanServer::PostRecv (Session * p)
 ======================================================================*/
 void CLanServer::PostSend (Session *p)
 {
-	if ( p->p_IOChk.UseFlag == false )
-	{
-		return;
-	}
-
-	InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount);
-
-	if ( InterlockedCompareExchange (( volatile long * )&p->SendFlag, TRUE, FALSE) == TRUE )
-	{
-		IODecrement (p);
-		return;
-	}
-
-	//WSASend 셋팅 및 등록부
-
-	DWORD Cnt = 0;
-	WSABUF buf[SendbufMax];
-
-	Packet *pack = NULL;
-
-	while ( 1 )
-	{
-
-
-		if ( p->SendQ.Dequeue (&pack) == false )
-		{
-			break;
-		}
-
-
-		if ( Cnt >= SendbufMax )
-		{
-			break;
-		}
-
-		buf[Cnt].len = pack->GetDataSize ();
-		buf[Cnt].buf = pack->GetBufferPtr ();
-		p->SendPack.Push (pack);
-
-		Cnt++;
-	}
-
-	if ( Cnt == 0 )
-	{
-		p->SendFlag = FALSE;
-		IODecrement (p);
-		return;
-	}
-
-	memset (&p->SendOver, 0, sizeof (p->SendOver));
-	DWORD dwFlag = 0;
-	DWORD SendByte;
-	int retval;
-
-	retval = WSASend (p->sock, buf, Cnt, &SendByte, dwFlag, &p->SendOver, NULL);
-
-	//에러체크
-	if ( retval == SOCKET_ERROR )
-	{
-		DWORD Errcode = GetLastError ();
-
-		//IO_PENDING이라면 문제없이 진행중이므로 그냥 빠져나옴.
-		if ( Errcode != WSA_IO_PENDING )
-		{
-
-			if ( Errcode == WSAENOBUFS )
-			{
-				LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld WSAENOBUFS ERROR ", p->SessionID, Errcode);
-			}
-			else
-			{
-				LOG_LOG (L"Network", LOG_ERROR, L"SessionID = 0x%p, ErrorCode = %ld PostSend", p->SessionID, Errcode);
-			}
-
-			shutdown (p->sock, SD_BOTH);
-			IODecrement (p);
-
-		}
-	}
-	return;
+	
 }
 
 

@@ -11434,3 +11434,14 @@
 [00000455] [ Network ] [2018-10-01 11:52:43 / DEBUG ]  Session 0x0098000000000030, Transferred 0 RecvOver
 [00000456] [ Network ] [2018-10-01 11:52:43 / DEBUG ]  Session 0x0097000000000031, Transferred 0 RecvOver
 [00000457] [ Network ] [2018-10-01 11:52:43 / DEBUG ]  Session 0x0096000000000032, Transferred 0 RecvOver
+[00000001] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]   NetworkStart IP = 127.0.0.1, PORT = 6000, SessionMax = 200, WorkerThreadNum = 10
+[00000002] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]  Worker Thread_Start
+[00000003] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]  AcceptThread_Start
+[00000004] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]  Send Thread_Start
+[00000005] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]  Worker Thread_Start
+[00000006] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]  Worker Thread_Start
+[00000007] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]  Worker Thread_Start
+[00000008] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]  Worker Thread_Start
+[00000009] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]  Worker Thread_Start
+[00000010] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]  Worker Thread_Start
+[00000011] [ Network ] [2018-10-05 15:40:42 / SYSTEM ]  Worker Thread_Start
