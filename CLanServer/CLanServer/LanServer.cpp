@@ -270,7 +270,7 @@ void CLanServer::AcceptThread (void)
 		{
 			closesocket (hClientSock);
 			LOG_LOG (L"Network", LOG_SYSTEM, L"Session %d Use Full ", _Session_Max);
-			break;
+			continue;
 		}
 		int Cnt;
 		emptySession.Pop (&Cnt);
