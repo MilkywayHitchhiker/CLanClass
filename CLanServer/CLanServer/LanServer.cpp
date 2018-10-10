@@ -504,20 +504,11 @@ void CLanServer::WorkerThread (void)
 					}
 					Packet::Free (Pack);
 				}
+
 				if ( pSession->SendDisconnect == TRUE )
 				{
-					pSession->SendFlag = FALSE;
 					shutdown (pSession->sock, SD_BOTH);
 				}
-				else
-				{
-					pSession->SendFlag = FALSE;
-					if ( pSession->SendQ.GetUseSize () > 0 )
-					{
-						PostSend (pSession);
-					}
-				}
-
 
 				InterlockedIncrement (( volatile LONG * )&_SendPacketTPS);
 
@@ -573,11 +564,6 @@ void CLanServer::SendThread (void)
 				continue;
 			}
 
-			if ( InterlockedCompareExchange (( volatile long * )&p->SendFlag, TRUE, FALSE) == TRUE )
-			{
-				continue;
-			}
-
 			if ( InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount) == 1 )
 			{
 				IODecrement (p);
@@ -616,7 +602,6 @@ void CLanServer::SendThread (void)
 
 			if ( Cnt == 0 )
 			{
-				p->SendFlag = FALSE;
 				IODecrement (p);
 				continue;
 			}

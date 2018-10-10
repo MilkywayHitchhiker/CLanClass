@@ -32,8 +32,6 @@ protected:
 		SOCKET sock;
 		UINT64 SessionID;
 
-
-		long SendFlag = FALSE;
 		bool SendDisconnect = FALSE;
 		CQueue_LF<Packet *> SendQ;
 		OVERLAPPED SendOver;
