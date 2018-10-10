@@ -49,7 +49,7 @@ public:
 		Packet *Pack = Packet::Alloc ();
 		*Pack << Data;
 
-		SendPacket_Accept (SessionID, Pack);
+		SendPacket (SessionID, Pack);
 
 
 		Packet::Free (Pack);
@@ -70,7 +70,7 @@ int main ()
 	LOG_LEVEL (LOG_WARNING, false);
 //	CServerConfig::Initialize ();
 	wprintf (L"MainThread Start\n");
-	Network.Start (L"127.0.0.1", 6000, 200, 10);
+	Network.Start (L"0.0.0.0", 6000, 200, 10);
 
 
 	UINT AcceptTotal = 0;
