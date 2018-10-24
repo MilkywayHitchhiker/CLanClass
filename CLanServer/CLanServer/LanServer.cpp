@@ -493,10 +493,11 @@ void CLanServer::WorkerThread (void)
 			//Send일 경우
 			else if ( pOver == &pSession->SendOver )
 			{
+				int Send = pSession->SendNum;
 				OnSend (pSession->SessionID, Transferred);
 
 				Packet *Pack;
-				while ( 1 )
+				for (int Cnt = Send ; Cnt > 0 ; Cnt-- )
 				{
 					if ( pSession->SendPack.Pop (&Pack) == false )
 					{
@@ -504,6 +505,8 @@ void CLanServer::WorkerThread (void)
 					}
 					Packet::Free (Pack);
 				}
+				pSession->SendNum -= Send;
+
 
 				if ( pSession->SendDisconnect == TRUE )
 				{
@@ -564,6 +567,11 @@ void CLanServer::SendThread (void)
 				continue;
 			}
 
+			if ( p->SendNum != 0 )
+			{
+				continue;
+			}
+
 			if ( InterlockedIncrement (( volatile long * )&p->p_IOChk.IOCount) == 1 )
 			{
 				IODecrement (p);
@@ -611,6 +619,7 @@ void CLanServer::SendThread (void)
 			DWORD SendByte;
 			int retval;
 
+			p->SendNum += Cnt;
 			retval = WSASend (p->sock, buf, Cnt, &SendByte, dwFlag, &p->SendOver, NULL);
 
 			//에러체크
@@ -864,6 +873,7 @@ void CLanServer::SessionRelease (Session * p)
 	p->RecvQ.ClearBuffer ();
 
 	Packet *pack;
+	int SendCnt = 0;
 
 	while ( 1 )
 	{
@@ -871,6 +881,8 @@ void CLanServer::SessionRelease (Session * p)
 		{
 			break;
 		}
+
+		SendCnt++;
 		Packet::Free (pack);
 	}
 
@@ -882,6 +894,7 @@ void CLanServer::SessionRelease (Session * p)
 			break;
 		}
 
+		SendCnt++;
 		Packet::Free (pack);
 	}
 
@@ -894,6 +907,8 @@ void CLanServer::SessionRelease (Session * p)
 
 
 	closesocket (p->sock);
+
+	p->SendNum -= SendCnt;
 
 	emptySession.Push (indexSessionID (p->SessionID));
 

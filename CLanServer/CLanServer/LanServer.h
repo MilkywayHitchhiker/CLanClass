@@ -33,6 +33,7 @@ protected:
 		UINT64 SessionID;
 
 		bool SendDisconnect = FALSE;
+		int SendNum = 0;
 		CQueue_LF<Packet *> SendQ;
 		OVERLAPPED SendOver;
 		CStack_LF<Packet *> SendPack;
